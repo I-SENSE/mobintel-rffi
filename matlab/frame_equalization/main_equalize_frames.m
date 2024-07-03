@@ -1,5 +1,5 @@
 % This function takes as input a root directory of the RX device, and then processes each of the packets, leaving a new batch of processed packets.
-function [] = main_equalize_frames(input_dir, output_dir)
+function [] = main_equalize_frames(input_dir, output_dir, min_frame_limit)
     tx_nodes = dir([input_dir, 'packets/']);
 
     % Skip first two entries ('.' and '..')
@@ -12,9 +12,9 @@ function [] = main_equalize_frames(input_dir, output_dir)
 
         fprintf(sprintf('Node %d of %d: %s (%d packets)\n' , tx_node, length(tx_nodes), fl, length(packet_log_in))); 
 
-        % Only process the emitter if there are at least 1000 frames from
+        % Only process the emitter if there are at least min_frame_limit from
         % it (we need more, but this is the min bar)
-        if length(packet_log_in) < 1000
+        if length(packet_log_in) < min_frame_limit
             disp('Not enough packets available.');
             continue;
         end
@@ -23,9 +23,16 @@ function [] = main_equalize_frames(input_dir, output_dir)
         for pkt_i=1:length(packet_log_in)
             pkt = packet_log_in{pkt_i};
             [preamble_clean, preamble_equalized] = process_frame(pkt);
-            if ~isempty(preamble_clean)
+            if ~isempty(preamble_clean) 
                 packet_log_op{end+1} = [preamble_clean, preamble_equalized];
             end
+        end
+
+        % Only process the emitter if there are at least min_frame_limit from
+        % it (we need more, but this is the min bar)
+        if length(packet_log_op) < min_frame_limit
+            disp('Not enough packets available.');
+            continue;
         end
 
         packet_log=packet_log_op;

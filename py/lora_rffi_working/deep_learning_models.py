@@ -5,8 +5,6 @@ from keras import backend as K
 from keras.models import Model
 from keras.layers import Input, Lambda, ReLU, Add, Dense, Conv2D, Flatten, AveragePooling2D
 
-
-# In[]
 def resblock(x, kernelsize, filters, first_layer = False):
 
     if first_layer:
@@ -39,7 +37,7 @@ class TripletNet():
         
     def create_triplet_net(self, embedding_net, alpha):
         
-#        embedding_net = encoder()
+        #        embedding_net = encoder()
         self.alpha = alpha
         
         input_1 = Input([self.datashape[1],self.datashape[2],self.datashape[3]])
@@ -55,12 +53,12 @@ class TripletNet():
         return model
       
     def triplet_loss(self,x):
-    # Triplet Loss function.
+        # Triplet Loss function.
         anchor,positive,negative = x
-#        K.l2_normalize
-    # distance between the anchor and the positive
+        #        K.l2_normalize
+        # distance between the anchor and the positive
         pos_dist = K.sum(K.square(anchor-positive),axis=1)
-    # distance between the anchor and the negative
+        # distance between the anchor and the negative
         neg_dist = K.sum(K.square(anchor-negative),axis=1)
 
         basic_loss = pos_dist-neg_dist + self.alpha

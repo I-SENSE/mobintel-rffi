@@ -1,23 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-
 from sklearn.metrics import roc_curve, auc , confusion_matrix, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
-
-
 from keras.models import load_model
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from keras.optimizers import RMSprop
-
-
 from dataset_preparation import awgn, LoadDataset, ChannelIndSpectrogram
 from deep_learning_models import TripletNet, identity_loss
-
-
-#%%
 
 def train_feature_extractor(
         file_path = './dataset/Train/dataset_training_aug.h5', 
@@ -206,173 +197,17 @@ def test_classification(
     
     return pred_label, true_label, acc
 
-
-
-
-def test_rogue_device_detection(
-    feature_extractor_name,
-    file_path_enrol = './dataset/Test/dataset_residential.h5',
-    dev_range_enrol = np.arange(30,40, dtype = int),
-    pkt_range_enrol = np.arange(0,100, dtype = int),
-    file_path_legitimate = './dataset/Test/dataset_residential.h5',
-    dev_range_legitimate = np.arange(30,40, dtype = int),
-    pkt_range_legitimate = np.arange(100,200, dtype = int),
-    file_path_rogue = './dataset/Test/dataset_rogue.h5',
-    dev_range_rogue = np.arange(40,45, dtype = int),
-    pkt_range_rogue = np.arange(0,100, dtype = int),
-    ):
-
-    '''
-    test_rogue_device_detection performs the rogue device detection task using
-    a specific RFF extractor. It returns false positive rate (FPR), true 
-    positive rate (TPR), area under the curve (AUC) and corresponding threshold 
-    settings.
-    
-    INPUT: 
-    
-        FEATURE_EXTRACTOR_NAME is the name of RFF extractor used in rogue 
-        device detection.
-        
-        FILE_PATH_ENROL is the path of enrollment dataset.
-        
-        DEV_RANGE_ENROL is the device index range used in the enrollment stage.
-        
-        PKT_RANGE_ENROL is the packet index range used in the enrollment stage.
-        
-        FILE_PATH_LEGITIMATE is the path of dataset contains packets from
-        legitimate devices.
-        
-        DEV_RANGE_LEGITIMATE is the index range of legitimate devices used in
-        the rogue device detection stage.
-        
-        PKT_RANGE_LEGITIMATE specifies the packet range from legitimate devices 
-        used in the rogue device detection stage.
-        
-        FILE_PATH_ROGUE is the path of dataset contains packets from rogue 
-        devices.
-        
-        DEV_RANGE_ROGUE is the index range of rogue devices used in the rogue 
-        device detection stage.
-        
-        PKT_RANGE_ROGUE specifies the packet range from rogue devices used in 
-        the rogue device detection stage.
-    
-    RETURN:
-        FPR is the detection false positive rate.
-        
-        TRP is the detection true positive rate.
-
-        ROC_AUC is the area under the ROC curve.
-        
-        EER is the equal error rate.
-        
-    '''
-
-    
-    def _compute_eer(fpr,tpr,thresholds):
-        '''
-        _COMPUTE_EER returns equal error rate (EER) and the threshold to reach
-        EER point.
-        '''
-        fnr = 1-tpr
-        abs_diffs = np.abs(fpr - fnr)
-        min_index = np.argmin(abs_diffs)
-        eer = np.mean((fpr[min_index], fnr[min_index]))
-        
-        return eer, thresholds[min_index]
-    
-    # Load RFF extractor.
-    feature_extractor = load_model(feature_extractor_name, compile=False)
-    
-    LoadDatasetObj = LoadDataset()
-    
-    # Load enrollment dataset.
-    data_enrol, label_enrol = LoadDatasetObj.load_iq_samples(file_path_enrol, 
-                                                             dev_range_enrol, 
-                                                             pkt_range_enrol)
-    
-    ChannelIndSpectrogramObj = ChannelIndSpectrogram()
-    
-    # Convert IQ samples to channel independent spectrograms.
-    data_enrol = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_enrol)
-    
-    # Extract RFFs from cahnnel independent spectrograms.
-    feature_enrol = feature_extractor.predict(data_enrol)
-    del data_enrol
-    
-    # Build a K-NN classifier.
-    knnclf=KNeighborsClassifier(n_neighbors=15,metric='euclidean')
-    knnclf.fit(feature_enrol, np.ravel(label_enrol))
-    
-    # Load the test dataset of legitimate devices.
-    data_legitimate, label_legitimate = LoadDatasetObj.load_iq_samples(file_path_legitimate, 
-                                                                       dev_range_legitimate, 
-                                                                       pkt_range_legitimate)
-    # Load the test dataset of rogue devices.
-    data_rogue, label_rogue = LoadDatasetObj.load_iq_samples(file_path_rogue, 
-                                                             dev_range_rogue, 
-                                                             pkt_range_rogue)
-    
-    # Combine the above two datasets into one dataset containing both rogue
-    # and legitimate devices.
-    data_test = np.concatenate([data_legitimate,data_rogue])
-    label_test = np.concatenate([label_legitimate,label_rogue])
-    
-    # Convert IQ samples to channel independent spectrograms.
-    data_test = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_test)
-
-    # Extract RFFs from channel independent spectrograms.
-    feature_test = feature_extractor.predict(data_test)
-    del data_test
-
-    # Find the nearest 15 neighbors in the RFF database and calculate the 
-    # distances to them.
-    distances, indexes = knnclf.kneighbors(feature_test)
-    
-    # Calculate the average distance to the nearest 15 neighbors.
-    detection_score = distances.mean(axis =1)
-
-    # Label the packets sent from legitimate devices as 1. The rest are sent by rogue devices
-    # and are labeled as 0.
-    true_label = np.zeros([len(label_test),1])
-    true_label[(label_test <= dev_range_legitimate[-1]) & (label_test >= dev_range_legitimate[0])] = 1
-    
-    # Compute receiver operating characteristic (ROC).
-    fpr, tpr, thresholds = roc_curve(true_label, detection_score, pos_label = 1)
-    
-    # The Euc. distance is used as the detection score. The lower the value, 
-    # the more similar it is. This is opposite with the probability or confidence 
-    # value used in scikit-learn roc_curve function. Therefore, we need to subtract 
-    # them from 1.
-    fpr = 1-fpr  
-    tpr = 1-tpr
-
-    # Compute EER.
-    eer, _ = _compute_eer(fpr,tpr,thresholds)
-    
-    # Compute AUC.
-    roc_auc = auc(fpr, tpr)
-    
-    return fpr, tpr, roc_auc, eer
-    
 if __name__ == '__main__':
     
-    # Specifies what task the program runs for. 
-    # 'Train'/'Classification'/'Rogue Device Detection'
+    # run_for = 'Train'
     run_for = 'Classification'
 
     root_path = '/home/smazokha2016/Desktop'
     
     if run_for == 'Train':
-
-        # Train an RFF extractor.
         feature_extractor = train_feature_extractor(root_path + '/lora_dataset/Train/dataset_training_aug.h5')
-        # Save the trained model.
         feature_extractor.save(root_path + '/my_models/Extractor.h5')
-        
-    
     elif run_for == 'Classification':
-        
         # Specify the device index range for classification.
         test_dev_range = np.arange(30,40, dtype = int)
         
@@ -380,7 +215,7 @@ if __name__ == '__main__':
         pred_label, true_label, acc = test_classification(file_path_enrol = 
                                                           root_path + '/lora_dataset/Test/dataset_residential.h5',
                                                           file_path_clf = 
-                                                          root_path + '/lora_dataset/Test/channel_problem/A.sh5',
+                                                          root_path + '/lora_dataset/Test/channel_problem/A.h5',
                                                           feature_extractor_name = 
                                                           root_path + '/my_models/Extractor.h5')
         
@@ -396,9 +231,3 @@ if __name__ == '__main__':
                     yticklabels=classes)
         plt.xlabel('Predicted label', fontsize = 20)
         plt.ylabel('True label', fontsize = 20)
-
-
-
-
-
-

@@ -2,10 +2,7 @@ import numpy as np
 import h5py
 from numpy import sum,sqrt
 from numpy.random import standard_normal, uniform
-
 from scipy import signal
-
-# In[]
 
 def awgn(data, snr_range):
     
@@ -21,8 +18,6 @@ def awgn(data, snr_range):
         data[pktIdx] = s + n
 
     return data 
-
-
 
 class LoadDataset():
     def __init__(self,):

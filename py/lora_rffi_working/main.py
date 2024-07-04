@@ -13,7 +13,7 @@ from deep_learning_models import TripletNet, identity_loss
 def train_feature_extractor(
         file_path = './dataset/Train/dataset_training_aug.h5', 
         dev_range = np.arange(0,30, dtype = int), 
-        pkt_range = np.arange(0,1000, dtype = int), 
+        pkt_range = np.arange(0,500, dtype = int), # TODO: was 1000
         snr_range = np.arange(20,80)
                             ):
     '''
@@ -47,11 +47,17 @@ def train_feature_extractor(
     
     # Convert time-domain IQ samples to channel-independent spectrograms.
     data = ChannelIndSpectrogramObj.channel_ind_spectrogram(data)
+
+    # for i in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
+    #     print('Plotting')
+    #     plt.figure()
+    #     sns.heatmap(data[i + 10000, :, :, 0])
+    #     plt.show()
     
     # Specify hyper-parameters during training.
     margin = 0.1
     batch_size = 32
-    patience = 20
+    patience = 15
     
     TripletNetObj = TripletNet()
     
@@ -113,10 +119,10 @@ def test_classification(
         file_path_enrol,
         file_path_clf,
         feature_extractor_name,
-        dev_range_enrol = np.arange(30,40, dtype = int),
+        dev_range_enrol = np.arange(0,15, dtype = int),
         pkt_range_enrol = np.arange(0,100, dtype = int),
-        dev_range_clf = np.arange(30,40, dtype = int),
-        pkt_range_clf = np.arange(100,200, dtype = int)
+        dev_range_clf = np.arange(0,15, dtype = int),
+        pkt_range_clf = np.arange(400,500, dtype = int)
                         ):
     '''
     test_classification performs a classification task and returns the 
@@ -199,25 +205,26 @@ def test_classification(
 
 if __name__ == '__main__':
     
-    # run_for = 'Train'
+    #run_for = 'Train'
     run_for = 'Classification'
 
     root_path = '/home/smazokha2016/Desktop'
+    dataset_name = '/wisig_dataset'
     
     if run_for == 'Train':
-        feature_extractor = train_feature_extractor(root_path + '/lora_dataset/Train/dataset_training_aug.h5')
-        feature_extractor.save(root_path + '/my_models/Extractor.h5')
+        feature_extractor = train_feature_extractor(root_path + dataset_name + '/Train/node1-1_non_eq_train.h5')
+        feature_extractor.save(root_path + '/my_models/Extractor_Wisig.h5')
     elif run_for == 'Classification':
         # Specify the device index range for classification.
-        test_dev_range = np.arange(30,40, dtype = int)
+        test_dev_range = np.arange(0,15, dtype = int)
         
         # Perform the classification task.
         pred_label, true_label, acc = test_classification(file_path_enrol = 
-                                                          root_path + '/lora_dataset/Test/dataset_residential.h5',
+                                                          root_path + dataset_name + '/Test/node1-1_non_eq_test.h5',
                                                           file_path_clf = 
-                                                          root_path + '/lora_dataset/Test/channel_problem/A.h5',
+                                                          root_path + dataset_name + '/Test/node1-1_non_eq_test.h5',
                                                           feature_extractor_name = 
-                                                          root_path + '/my_models/Extractor.h5')
+                                                          root_path + '/my_models/Extractor_Wisig.h5')
         
         # Plot the confusion matrix.
         conf_mat = confusion_matrix(true_label, pred_label)
@@ -231,3 +238,4 @@ if __name__ == '__main__':
                     yticklabels=classes)
         plt.xlabel('Predicted label', fontsize = 20)
         plt.ylabel('True label', fontsize = 20)
+        plt.show()

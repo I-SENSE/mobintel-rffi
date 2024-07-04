@@ -79,8 +79,6 @@ class LoadDataset():
         f.close()
         return data,label
 
-
-
 class ChannelIndSpectrogram():
     def __init__(self,):
         pass

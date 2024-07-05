@@ -40,6 +40,8 @@ def train_feature_extractor(
                                                  dev_range, 
                                                  pkt_range)
     
+    dev_range = np.array(list(set(label.flatten())))
+    
     # Add additive Gaussian noise to the IQ samples.
     data = awgn(data, snr_range)
     
@@ -205,13 +207,13 @@ def test_classification(
 
 if __name__ == '__main__':
     
-    #run_for = 'Train'
+    # run_for = 'Train'
     run_for = 'Classification'
 
     root_path = '/home/smazokha2016/Desktop'
     dataset_train = '/wisig_dataset-2021_03_01'
-    dataset_enrol = '/wisig_dataset-2021_03_01'
-    dataset_identify = '/wisig_dataset-2021_03_01'
+    dataset_enrol = '/wisig_dataset-2021_03_08'
+    dataset_identify = '/wisig_dataset-2021_03_08'
     
     if run_for == 'Train':
         feature_extractor = train_feature_extractor(root_path + dataset_train + '/Train/node1-1_non_eq_train.h5')
@@ -229,12 +231,12 @@ if __name__ == '__main__':
                                                           root_path + '/my_models/Extractor_Wisig_day1.h5')
         
         # Plot the confusion matrix.
-        conf_mat = confusion_matrix(true_label, pred_label)
+        conf_mat = confusion_matrix(true_label, pred_label, normalize='true')
         classes = test_dev_range + 1
         
         plt.figure()
         sns.heatmap(conf_mat, annot=True, 
-                    fmt = 'd', cmap='Blues',
+                    cmap='Blues',
                     cbar = False,
                     xticklabels=classes, 
                     yticklabels=classes)

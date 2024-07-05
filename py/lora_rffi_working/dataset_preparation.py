@@ -57,27 +57,29 @@ class LoadDataset():
         label = label.astype(int)
         # label = np.transpose(label)
         # label = label - 1
-        print(label[0])
+        # print(label[0])
 
-        label_start = int(label[0]) + 1
-        label_end = int(label[-1]) + 1
-        num_dev = label_end - label_start + 1
-        num_pkt = len(label)
-        num_pkt_per_dev = int(num_pkt/num_dev)
+        # label_start = int(label[0]) + 1
+        # label_end = int(label[-1]) + 1
+        # num_dev = len(set(label.flatten()))
+        # num_pkt = len(label)
+        # num_pkt_per_dev = int(num_pkt/num_dev)
         
-        print('Dataset information: Dev ' + str(label_start) + ' to Dev ' + 
-              str(label_end) + ', ' + str(num_pkt_per_dev) + ' packets per device.')
+        # print('Dataset information: Dev ' + str(label_start) + ' to Dev ' + 
+        #       str(label_end) + ', ' + str(num_pkt_per_dev) + ' packets per device.')
         
-        sample_index_list = []
+        # sample_index_list = []
         
-        for dev_idx in dev_range:
-            sample_index_dev = np.where(label==dev_idx)[0][pkt_range].tolist()
-            sample_index_list.extend(sample_index_dev)
+        # for dev_idx in set(label.flatten()):
+        #     sample_index_dev = np.where(label==int(dev_idx))[0][pkt_range].tolist()
+        #     sample_index_list.extend(sample_index_dev)
+
+        # print(len(sample_index_list))
     
-        data = f[self.dataset_name][sample_index_list]
+        data = f[self.dataset_name][:]
         data = self._convert_to_complex(data)
         
-        label = label[sample_index_list]
+        # label = label[sample_index_list]
           
         f.close()
         return data,label

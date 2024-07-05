@@ -209,22 +209,24 @@ if __name__ == '__main__':
     run_for = 'Classification'
 
     root_path = '/home/smazokha2016/Desktop'
-    dataset_name = '/wisig_dataset'
+    dataset_train = '/wisig_dataset-2021_03_01'
+    dataset_enrol = '/wisig_dataset-2021_03_01'
+    dataset_identify = '/wisig_dataset-2021_03_01'
     
     if run_for == 'Train':
-        feature_extractor = train_feature_extractor(root_path + dataset_name + '/Train/node1-1_non_eq_train.h5')
-        feature_extractor.save(root_path + '/my_models/Extractor_Wisig.h5')
+        feature_extractor = train_feature_extractor(root_path + dataset_train + '/Train/node1-1_non_eq_train.h5')
+        feature_extractor.save(root_path + '/my_models/Extractor_Wisig_day1.h5')
     elif run_for == 'Classification':
         # Specify the device index range for classification.
         test_dev_range = np.arange(0,15, dtype = int)
         
         # Perform the classification task.
         pred_label, true_label, acc = test_classification(file_path_enrol = 
-                                                          root_path + dataset_name + '/Test/node1-1_non_eq_test.h5',
+                                                          root_path + dataset_enrol + '/Test/node1-1_non_eq_test.h5',
                                                           file_path_clf = 
-                                                          root_path + dataset_name + '/Test/node1-1_non_eq_test.h5',
+                                                          root_path + dataset_identify + '/Test/node1-1_non_eq_test.h5',
                                                           feature_extractor_name = 
-                                                          root_path + '/my_models/Extractor_Wisig.h5')
+                                                          root_path + '/my_models/Extractor_Wisig_day1.h5')
         
         # Plot the confusion matrix.
         conf_mat = confusion_matrix(true_label, pred_label)

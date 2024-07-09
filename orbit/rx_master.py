@@ -1,219 +1,170 @@
 import os
 import time
 
-JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org"
+# JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org"
+JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
 
 CORE_LOCAL_FOLDER = "/Users/stepanmazokha/Desktop/"
-CORE_REC_FOLDER = "/root/rec/"
+CORE_RX_FILE = "/root/samples.dat"
 
-MIMO_RACKS = [ # this array stores file naming for each of the MIMO antenna racks (indexing of array corresponds to 0-based corner indexing in the room)
-    # ["24-15_A.bin", "24-15_B.bin", "24-16_A.bin", "24-16_B.bin", "24-17_A.bin", "24-17_B.bin", "24-18_A.bin", "24-18_B.bin"],
-    ["24-17_A.bin", "24-17_B.bin", "24-18_A.bin", "24-18_B.bin"],
-    # ["24-5_A.bin", "24-5_B.bin", "24-6_A.bin", "24-6_B.bin", "24-7_A.bin", "24-7_B.bin", "24-8_A.bin", "24-8_B.bin"],
-    ["24-7_A.bin", "24-7_B.bin", "24-8_A.bin", "24-8_B.bin"],
-    # ["23-5_A.bin", "23-5_B.bin", "23-6_A.bin", "23-6_B.bin", "23-7_A.bin", "23-7_B.bin", "23-8_A.bin", "23-8_B.bin"],
-    ["23-5_A.bin", "23-5_B.bin", "23-6_A.bin", "23-6_B.bin"],
-    # ["23-15_A.bin", "23-15_B.bin", "23-16_A.bin", "23-16_B.bin", "23-17_A.bin", "23-17_B.bin", "23-18_A.bin", "23-18_B.bin"]
-    ["23-17_A.bin", "23-17_B.bin", "23-18_A.bin", "23-18_B.bin"]
-]
+RX_USRP_ARGS = "addr=192.168.10.2"
+RX_FREQ = "2462e6"
+RX_GAIN = "0.5"
+RX_CAP_LEN = "0.512"
+RX_SAMP_RATE = "25e6"
+RX_SKIP = "2"
+RX_LO_OFF = "10e6"
 
-# These are the routes to servers for each of the MIMO racks (in order [1, 2, 3, 4])
-MIMO_RACK_SERVERS = ["root@node21-1", "root@node21-4", "root@node21-2", "root@node21-6"]
+RX_NODES = ["node1-2"] # TODO: determine RX node IDs
 
-def send_command(node, command):
-    cmd = "ssh -J %s %s \"%s\"" % (JUMP_NODE_GRID, node, command)
+def send_command(needsJump, node, command):
+    if needsJump: 
+        cmd = "ssh -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
+    else: 
+        cmd = "ssh %s \"%s\"" % (node, command)
+
     print(cmd)
-    os.system(cmd)
+    # os.system(cmd) # TODO
 
-def local_create_dir(newdir):
-    if not os.path.exists(newdir):
-        os.mkdir(newdir)
+def node_configure(node_id):
+    send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
 
-def delete_rec_dir(nodes):
-    for node in nodes:
-        nodeRoute = MIMO_RACK_SERVERS[node]
-        print("Deleting " + CORE_REC_FOLDER + " directory.")
-        send_command(nodeRoute, "rm -rf " + CORE_REC_FOLDER)
-
-def download_recordings(mimo_racks, destination_path):
-    # mimo_racks: array of MIMO indexes (0-based), non-empty
-    # destination_path: full destination path for the SCP command
-    for rack in mimo_racks:
-        print(rack)
-        rackRoute = MIMO_RACK_SERVERS[rack]
-        for item in MIMO_RACKS[rack]:
-            cmd = "scp -J %s %s:%s %s" % (JUMP_NODE_GRID, rackRoute, os.path.join(CORE_REC_FOLDER, item), destination_path)
-            print(cmd)
-            os.system(cmd)
-
-def mode_mobile(rootFolder):
-    print("Working in mobile mode.")
-    rootFolder = os.path.join(rootFolder, "mobile")
-
-    if not os.path.exists(rootFolder):
-        print("Mobile folder doesn't exist. We'll create one.")
-        os.mkdir(rootFolder)
-
-    # Loop for creating emitter folder
     while True:
-        instruction = input("Ready to start? (back | any key to proceed) ")
+        input('Hit enter when ready to proceed')
+        send_command(True, node_id, "ls /root/")
 
-        if instruction == 'back':
-            return
-        else:
-            rootFolderOriginal = rootFolder
-
-            # Select emitter to save this to
-            emitter_X = input("What location is this (X coord): ")
-            emitter_Y = input("What location is this (Y coord): ")
-            emitter_coord = "location-%s_%s" % (emitter_X, emitter_Y)
-            rootFolder = os.path.join(rootFolder, emitter_coord)
-
-            if os.path.exists(rootFolder):
-                print("Such location exists. Saving here: " + rootFolder)
-            else: # attempt is correct
-                print("Creating folder for this attempt: " + rootFolder)
-                os.mkdir(rootFolder)
-
-            # Create timestamped folder to download data
-            rootFolder = os.path.join(rootFolder, str(int(time.time() * 1000)))
-            print("Final folder for data: " + rootFolder)
-            os.mkdir(rootFolder)
-
-            # Loop for executing relevant commands
-            sub_mode_instruction(rootFolder)
-
-            rootFolder = rootFolderOriginal
-
-def mode_radiomap(rootFolder):
-    # Mode radiomap:
-    # - create .../radiomap folder
-    # - create .../radiomap/emitter_X_Y folder
-    # - create .../radiomap/emitter_X_Y/timestamp folder
-    # - download selected data and/or delete /root/rec folder
-
-    print("Working in radiomap mode.")
-    rootFolder = os.path.join(rootFolder, "radiomap")
-
-    if not os.path.exists(rootFolder):
-        print("Radiomap folder doesn't exist. We'll create one.")
-        os.mkdir(rootFolder)
-
-    # Loop for creating emitter folder
-    while True:
-        instruction = input("Ready to start? (back | any key to proceed) ")
-
-        if instruction == 'back':
-            return
-        else:
-            rootFolderOriginal = rootFolder
-
-            # Select emitter to save this to
-            emitter_X = input("What emitter is this (X coord): ")
-            emitter_Y = input("What emitter is this (Y coord): ")
-            emitter_coord = "emitter-%s_%s" % (emitter_X, emitter_Y)
-            rootFolder = os.path.join(rootFolder, emitter_coord)
-
-            if os.path.exists(rootFolder):
-                print("Such emitter exists. Saving here: " + rootFolder)
-            else: # attempt is correct
-                print("Creating folder for this attempt: " + rootFolder)
-                os.mkdir(rootFolder)
-
-            # Create timestamped folder to download data
-            rootFolder = os.path.join(rootFolder, str(int(time.time() * 1000)))
-            print("Final folder for data: " + rootFolder)
-            os.mkdir(rootFolder)
-
-            # Loop for executing relevant commands
-            sub_mode_instruction(rootFolder)
-
-            rootFolder = rootFolderOriginal
-
-def sub_mode_instruction(rootFolder):
-    nodes = None
-    while True:
-        instruction = input("Which node should we deal with? [1 | 2 | 3 | 4 | all] ")
-
-        if instruction == 'all':
-            nodes = [0, 1, 2, 3]
+        instruction = input("Were you able to get a response? [Y/n]")
+        if instruction == 'Y':
             break
-        elif instruction == '1' or instruction == '2' or instruction == '3' or instruction == '4':
-            nodes = [int(instruction)-1]
+
+    send_command(True, node_id, "apt update")
+    send_command(True, node_id, "apt install uhd-host net-tools libuhd-dev xterm wireless-tools git")
+    send_command(True, node_id, "uhd_find_devices")
+    send_command(True, node_id, "iwconfig")
+
+    while True:
+        instruction = input("Do we need to configure IP address to USRP? [Y/n]")
+
+        if instruction == 'Y':
+            interface = input("Which interface should we use? (eth2 recommended)")
+            send_command(True, node_id, f"ifconfig {interface} 192.168.10.1 netmask 255.255.255.0 up")
+            send_command(True, node_id, "uhd_find_devices")
+
+            instruction = input("Did it work? [Y/any key]")
+            if instruction == 'Y': break
+            else: continue
+        elif instruction == 'n':
             break
-        else: print("Wrong command.")
+        else: print("Invalid command")
 
-    if not nodes: return
+    send_command(True, node_id, f'/usr/lib/uhd/examples/test_pps_input --args="{RX_USRP_ARGS}” --source external')
 
-    while True:
-        instruction = input("[%s] Action? [download | delete_rec_dir | back] " % str(nodes))
+    send_command(True, node_id, "cd /root/ && git clone https://github.com/i-sense/mobintel-rffi && mv /root/mobintel-rffi/orbit/gnuradio-n210 /root/ && rm -rf /root/mobintel-rffi")
 
-        if instruction == 'delete_rec_dir':
-            delete_rec_dir(nodes)
-        elif instruction == 'download':
-            download_recordings(nodes, rootFolder)
-            print("Deleting files from server...")
-            delete_rec_dir(nodes)
-        elif instruction == 'back':
-            return
-        else: print("Wrong command.")
+    print('Configure done')
 
-def mode_calibration(rootFolder):
-    # Mode calibration:
-    # - create .../calibration folder
-    # - create .../calibration/wired-X folder
-    # - download selected data and/or delete /root/rec folder
+def node_capture(tx_node_id, rx_node_id, local_dir):
+    # 1. Launch capture
+    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --args="{RX_USRP_ARGS}" --cap_len={RX_CAP_LEN} --fname={CORE_RX_FILE} --rx_freq={RX_FREQ} --rx_gain={RX_GAIN} --rx_lo_off={RX_LO_OFF} --rx_samp_rate={RX_SAMP_RATE} --skip={RX_SKIP}')
 
-    print("Working in calibration mode.")
-    rootFolder = os.path.join(rootFolder, "calibration")
+    # 2. Stop capture (kill tmux)
+    # TODO
 
-    if not os.path.exists(rootFolder):
-        print("Calibration folder doesn't exist. We'll create one.")
-        os.mkdir(rootFolder)
+    # 3. Download file to local device
+    filename = f"tx{{node/{tx_node_id}}}_rx{{node/{rx_node_id}-rxFreq/{RX_FREQ}-rxGain/{RX_GAIN}-capLen/{RX_CAP_LEN}-rxSampRate/{RX_SAMP_RATE}}}.dat"
+    path_local = os.path.join(local_dir, filename)
+    command = f"scp -J {JUMP_NODE_GRID} root@{rx_node_id}:{CORE_RX_FILE} {path_local}"
+    print(command)
+    # os.system(command)
 
-    input("Ready to start? (hit any key) ")
+    # 4. Delete file remotely
+    send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
 
-    # Loop for creating an attempt folder
-    while True:
-        attempt = input("What attempt is this? (1...1000 | back) ")
+    print('Capture done')
 
-        if attempt == 'back':
-            return
-        else:
-            rootFolderOriginal = rootFolder
+def mode_rx(node_ids, local_folder, tx_node_id):
+    if len(node_ids) == 0:
+        print('No nodes to emit from.')
+        return
 
-            attempt = "wired-" + attempt
-            if not os.path.exists(os.path.join(rootFolder, attempt)):
-                print("Creating attempt folder.")
-                rootFolder = os.path.join(rootFolder, attempt)
-                os.mkdir(rootFolder)
-            
-            # Get into sub mode to run as many commands as you need and then come back
-            sub_mode_instruction(rootFolder)
+    node_idx = 0
+    while node_idx < len(node_ids):
+        rx_node_id = node_ids[node_idx]
 
-            rootFolder = rootFolderOriginal
+        instruction = input(f"Ready to RX on {rx_node_id}? [Y/skip/done]")
+
+        if instruction == 'Y':
+            node_capture(tx_node_id, rx_node_id, local_folder)
+            node_idx = node_idx + 1
+        elif instruction == 'skip':
+            node_idx = node_idx + 1
+        elif instruction == 'done':
+            break
+        else: print('Invalid command')
+
+    print('Done')
+
+def mode_config(node_ids):
+    if len(node_ids) == 0:
+        print('No nodes to emit from.')
+        return
+    
+    node_idx = 0
+
+    while node_idx < len(node_ids):
+        node_id = node_ids[node_idx]
+
+        instruction = input(f"Ready to configure {node_id}? [Y/skip/done]")
+
+        if instruction == 'Y':
+            node_configure(node_id)
+            node_idx = node_idx + 1
+        elif instruction == 'skip':
+            node_idx = node_idx + 1
+        elif instruction == 'done':
+            break
+        else: print('Invalid command')
+
+    print('Done')
 
 def main():
-    print("Welcome, Stephan. Let's get started.")
+    print("Welcome! Let's get started.")
 
     rootFolder = input("Where should we store experiments of this run? (the folder MUST exist) ")
     if rootFolder == "": rootFolder = "debug"
     rootFolder = os.path.join(CORE_LOCAL_FOLDER, rootFolder)
 
     if not os.path.exists(rootFolder):
-        print("Root folder doesn't exist. We'll create one.")
+        print("Root folder doesn't exist. We'll create it.")
         os.mkdir(rootFolder)
 
     print("OK, we'll work here: " + rootFolder)
 
+    tx_node_id = input("Which node are we emitting from? [nodeX-Y]")
+
     while True:
-        rx_type = input("Which mode are we in? [mobile | radiomap | calibration] ")
-        if rx_type == 'mobile':
-            mode_mobile(rootFolder)
-        elif rx_type == 'radiomap':
-            mode_radiomap(rootFolder)
-        elif rx_type == 'calibration':
-            mode_calibration(rootFolder)
+        instruction = input("What should we do? [config | config one | rx | rx one]")
+
+        if instruction == 'config':
+            mode_config(RX_NODES)
+        elif instruction == 'config one':
+            node_id = input("Which node should we configure? [nodeX-Y]")
+            mode_config([node_id])
+        elif instruction == 'rx':
+            temp = input(f"Which node are we emitting from? [nodeX-Y | enter to use {tx_node_id}]")
+            if len(temp) > 0:
+                print(f"OK, TX = {tx_node_id}")
+                tx_node_id = temp
+            mode_rx(RX_NODES, rootFolder, tx_node_id)
+        elif instruction == 'rx one':
+            temp = input(f"Which node are we emitting from? [nodeX-Y | enter to use {tx_node_id}]")
+            if len(temp) > 0:
+                print(f"OK, TX = {tx_node_id}")
+                tx_node_id = temp
+            rx_node_id = input("Which node should we capture from? [nodeX-Y]")
+            mode_rx([rx_node_id], rootFolder, tx_node_id)
         else: print("Wrong command.")
 
 if __name__ == "__main__":

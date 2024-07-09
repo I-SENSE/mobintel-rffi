@@ -91,13 +91,12 @@ def mode_emit(tx_nodes):
     print('Done')
 
 def mode_config(nodes):
+    if len(nodes) == 0:
+        print('No nodes to emit from.')
+        return
+    
     node_idx = 0
-
-    while True:
-        if node_idx >= len(nodes):
-            print('Looped through all nodes.')
-            break
-
+    while node_idx < len(nodes):
         node_id = nodes[node_idx]
 
         instruction = input('Ready to configure ' + node_id + "? [Y/skip/done]")

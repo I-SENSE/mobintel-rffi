@@ -46,7 +46,7 @@ def node_configure(node_id):
 
     print('Configured.')
 
-def node_emit(node_id, interface="wlp6s8mon", c=11, mac="11:22:33:44:55:66", ssid="smazokha"):
+def node_emit(node_id, interface="wlp6s8mon", channel=11, mac="11:22:33:44:55:66", ssid="smazokha", interval="0.1"):
     send_command(True, node_id, "rfkill unblock wlan")
     
     while True:
@@ -55,7 +55,14 @@ def node_emit(node_id, interface="wlp6s8mon", c=11, mac="11:22:33:44:55:66", ssi
 
         send_command(True, node_id, f"airmon-ng start {interface}")
         send_command(True, node_id, "tmux kill-session -t emit")
-        send_command(True, node_id, f"/root/probe_request_injection/emit/emit.sh -i {interface}mon -c {c} --mac {mac} --interval 0.1 --ssid {ssid}")
+
+        # Note: probe emission code has been developed by Fanchen for one of our previous projects. 
+        # But this code provides an easy interface for emitting probe requests. 
+        # Importantly, the probes will be emitted for as long as the tmux sesh is running. 
+        # So, that's why we need to kill the session once we captured our data on the RX side.
+        
+        # TODO: determine most optimal interval for probe emission. Update the matlab IQ parser accordingly.
+        send_command(True, node_id, f"/root/probe_request_injection/emit/emit.sh -i {interface}mon -c {channel} --mac {mac} --interval {interval} --ssid {ssid}")
 
         command = input("What now? [emit/enter (to stop)]")
 

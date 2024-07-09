@@ -379,7 +379,7 @@ blocks:
     dc_offs7: 0+0j
     dc_offs8: 0+0j
     dc_offs9: 0+0j
-    dc_offs_enb0: default
+    dc_offs_enb0: True
     dc_offs_enb1: default
     dc_offs_enb10: default
     dc_offs_enb11: default
@@ -509,7 +509,7 @@ blocks:
     iq_imbal7: 0+0j
     iq_imbal8: 0+0j
     iq_imbal9: 0+0j
-    iq_imbal_enb0: default
+    iq_imbal_enb0: True
     iq_imbal_enb1: default
     iq_imbal_enb10: default
     iq_imbal_enb11: default

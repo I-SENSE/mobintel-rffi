@@ -50,6 +50,7 @@ def node_emit(node_id, interface="wlp6s8mon", c=11, mac="11:22:33:44:55:66", ssi
     send_command(True, node_id, "rfkill unblock wlan")
     
     while True:
+        send_command(True, node_id, "iwconfig")
         interface = input("What interface should we use?")
 
         send_command(True, node_id, f"airmon-ng start {interface}")

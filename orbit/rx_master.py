@@ -27,7 +27,7 @@ def send_command(needsJump, node, command):
         cmd = "ssh %s \"%s\"" % (node, command)
 
     print(cmd)
-    # os.system(cmd) # TODO
+    os.system(cmd)
 
 def node_configure(node_id):
     send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
@@ -43,7 +43,9 @@ def node_configure(node_id):
             break
 
     send_command(True, node_id, "apt update")
-    send_command(True, node_id, "apt install uhd-host net-tools libuhd-dev xterm wireless-tools git")
+    send_command(True, node_id, "sudo add-apt-repository ppa:gnuradio/gnuradio-releases-3.8")
+    send_command(True, node_id, "apt install uhd-host net-tools libuhd-dev xterm wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0")
+    send_command(True, node_id, "pip3 install gnuradio")
     send_command(True, node_id, "uhd_find_devices")
     send_command(True, node_id, "iwconfig")
 
@@ -62,7 +64,7 @@ def node_configure(node_id):
             break
         else: print("Invalid command")
 
-    send_command(True, node_id, f'/usr/lib/uhd/examples/test_pps_input --args="{RX_USRP_ARGS}” --source external')
+    send_command(True, node_id, f'/usr/lib/uhd/examples/test_pps_input --args=\\"{RX_USRP_ARGS}\\" --source external')
 
     send_command(True, node_id, "cd /root/ && git clone https://github.com/i-sense/mobintel-rffi && mv /root/mobintel-rffi/orbit/gnuradio-n210 /root/ && rm -rf /root/mobintel-rffi")
 
@@ -70,7 +72,7 @@ def node_configure(node_id):
 
 def node_capture(tx_node_id, rx_node_id, local_dir):
     # 1. Launch capture
-    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --args="{RX_USRP_ARGS}" --cap_len={RX_CAP_LEN} --fname="{CORE_RX_FILE}" --rx_freq={RX_FREQ} --rx_gain={RX_GAIN} --rx_lo_off={RX_LO_OFF} --rx_samp_rate={RX_SAMP_RATE} --skip={RX_SKIP}')
+    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --args=\\"{RX_USRP_ARGS}\\" --cap_len={RX_CAP_LEN} --fname=\\"{CORE_RX_FILE}\\" --rx_freq={RX_FREQ} --rx_gain={RX_GAIN} --rx_lo_off={RX_LO_OFF} --rx_samp_rate={RX_SAMP_RATE} --skip={RX_SKIP}')
 
     # 2. Stop capture (kill tmux)
     # TODO

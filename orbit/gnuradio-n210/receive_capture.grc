@@ -380,37 +380,37 @@ blocks:
     dc_offs8: 0+0j
     dc_offs9: 0+0j
     dc_offs_enb0: True
-    dc_offs_enb1: default
-    dc_offs_enb10: default
-    dc_offs_enb11: default
-    dc_offs_enb12: default
-    dc_offs_enb13: default
-    dc_offs_enb14: default
-    dc_offs_enb15: default
-    dc_offs_enb16: default
-    dc_offs_enb17: default
-    dc_offs_enb18: default
-    dc_offs_enb19: default
-    dc_offs_enb2: default
-    dc_offs_enb20: default
-    dc_offs_enb21: default
-    dc_offs_enb22: default
-    dc_offs_enb23: default
-    dc_offs_enb24: default
-    dc_offs_enb25: default
-    dc_offs_enb26: default
-    dc_offs_enb27: default
-    dc_offs_enb28: default
-    dc_offs_enb29: default
-    dc_offs_enb3: default
-    dc_offs_enb30: default
-    dc_offs_enb31: default
-    dc_offs_enb4: default
-    dc_offs_enb5: default
-    dc_offs_enb6: default
-    dc_offs_enb7: default
-    dc_offs_enb8: default
-    dc_offs_enb9: default
+    dc_offs_enb1: True
+    dc_offs_enb10: True
+    dc_offs_enb11: True
+    dc_offs_enb12: True
+    dc_offs_enb13: True
+    dc_offs_enb14: True
+    dc_offs_enb15: True
+    dc_offs_enb16: True
+    dc_offs_enb17: True
+    dc_offs_enb18: True
+    dc_offs_enb19: True
+    dc_offs_enb2: True
+    dc_offs_enb20: True
+    dc_offs_enb21: True
+    dc_offs_enb22: True
+    dc_offs_enb23: True
+    dc_offs_enb24: True
+    dc_offs_enb25: True
+    dc_offs_enb26: True
+    dc_offs_enb27: True
+    dc_offs_enb28: True
+    dc_offs_enb29: True
+    dc_offs_enb3: True
+    dc_offs_enb30: True
+    dc_offs_enb31: True
+    dc_offs_enb4: True
+    dc_offs_enb5: True
+    dc_offs_enb6: True
+    dc_offs_enb7: True
+    dc_offs_enb8: True
+    dc_offs_enb9: True
     dev_addr: args
     dev_args: '""'
     gain0: rx_gain
@@ -510,37 +510,37 @@ blocks:
     iq_imbal8: 0+0j
     iq_imbal9: 0+0j
     iq_imbal_enb0: True
-    iq_imbal_enb1: default
-    iq_imbal_enb10: default
-    iq_imbal_enb11: default
-    iq_imbal_enb12: default
-    iq_imbal_enb13: default
-    iq_imbal_enb14: default
-    iq_imbal_enb15: default
-    iq_imbal_enb16: default
-    iq_imbal_enb17: default
-    iq_imbal_enb18: default
-    iq_imbal_enb19: default
-    iq_imbal_enb2: default
-    iq_imbal_enb20: default
-    iq_imbal_enb21: default
-    iq_imbal_enb22: default
-    iq_imbal_enb23: default
-    iq_imbal_enb24: default
-    iq_imbal_enb25: default
-    iq_imbal_enb26: default
-    iq_imbal_enb27: default
-    iq_imbal_enb28: default
-    iq_imbal_enb29: default
-    iq_imbal_enb3: default
-    iq_imbal_enb30: default
-    iq_imbal_enb31: default
-    iq_imbal_enb4: default
-    iq_imbal_enb5: default
-    iq_imbal_enb6: default
-    iq_imbal_enb7: default
-    iq_imbal_enb8: default
-    iq_imbal_enb9: default
+    iq_imbal_enb1: True
+    iq_imbal_enb10: True
+    iq_imbal_enb11: True
+    iq_imbal_enb12: True
+    iq_imbal_enb13: True
+    iq_imbal_enb14: True
+    iq_imbal_enb15: True
+    iq_imbal_enb16: True
+    iq_imbal_enb17: True
+    iq_imbal_enb18: True
+    iq_imbal_enb19: True
+    iq_imbal_enb2: True
+    iq_imbal_enb20: True
+    iq_imbal_enb21: True
+    iq_imbal_enb22: True
+    iq_imbal_enb23: True
+    iq_imbal_enb24: True
+    iq_imbal_enb25: True
+    iq_imbal_enb26: True
+    iq_imbal_enb27: True
+    iq_imbal_enb28: True
+    iq_imbal_enb29: True
+    iq_imbal_enb3: True
+    iq_imbal_enb30: True
+    iq_imbal_enb31: True
+    iq_imbal_enb4: True
+    iq_imbal_enb5: True
+    iq_imbal_enb6: True
+    iq_imbal_enb7: True
+    iq_imbal_enb8: True
+    iq_imbal_enb9: True
     lo_export0: 'False'
     lo_export1: 'False'
     lo_export10: 'False'

@@ -1,25 +1,32 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-##################################################
+
+#
+# SPDX-License-Identifier: GPL-3.0
+#
 # GNU Radio Python Flow Graph
 # Title: Receive Capture
-# Generated: Fri Jan  8 14:11:14 2021
-##################################################
+# GNU Radio version: 3.10.9.2
 
 from gnuradio import blocks
-from gnuradio import eng_notation
 from gnuradio import gr
-from gnuradio import uhd
-from gnuradio.eng_option import eng_option
 from gnuradio.filter import firdes
-from optparse import OptionParser
+from gnuradio.fft import window
+import sys
+import signal
+from argparse import ArgumentParser
+from gnuradio.eng_arg import eng_float, intx
+from gnuradio import eng_notation
+from gnuradio import uhd
 import time
+
+
 
 
 class receive_capture(gr.top_block):
 
-    def __init__(self, args="addr=192.168.10.2", cap_len=1, fname="received_samples.dat", rx_freq=915e6, rx_gain=0.8, rx_lo_off=1e6, rx_samp_rate=1e6, skip=1):
-        gr.top_block.__init__(self, "Receive Capture")
+    def __init__(self, args="addr=192.168.10.2", cap_len=0.512, fname="/root/received_samples.dat", rx_freq=2462e6, rx_gain=0.5, rx_lo_off=10e6, rx_samp_rate=25e6, skip=2):
+        gr.top_block.__init__(self, "Receive Capture", catch_exceptions=True)
 
         ##################################################
         # Parameters
@@ -36,22 +43,25 @@ class receive_capture(gr.top_block):
         ##################################################
         # Blocks
         ##################################################
+
         self.uhd_usrp_source_0 = uhd.usrp_source(
-        	",".join((args, "")),
-        	uhd.stream_args(
-        		cpu_format="fc32",
-        		channels=range(1),
-        	),
+            ",".join((args, "")),
+            uhd.stream_args(
+                cpu_format="fc32",
+                args='',
+                channels=list(range(0,1)),
+            ),
         )
         self.uhd_usrp_source_0.set_samp_rate(rx_samp_rate)
+        # No synchronization enforced.
+
         self.uhd_usrp_source_0.set_center_freq(uhd.tune_request(rx_freq,rx_lo_off), 0)
-        self.uhd_usrp_source_0.set_normalized_gain(rx_gain, 0)
-        self.uhd_usrp_source_0.set_auto_dc_offset(True, 0)
-        self.uhd_usrp_source_0.set_auto_iq_balance(True, 0)
-        self.blocks_skiphead_0 = blocks.skiphead(gr.sizeof_gr_complex*1, int(skip*rx_samp_rate))
-        self.blocks_head_0 = blocks.head(gr.sizeof_gr_complex*1, int(cap_len*rx_samp_rate))
+        self.uhd_usrp_source_0.set_gain(rx_gain, 0)
+        self.blocks_skiphead_0 = blocks.skiphead(gr.sizeof_gr_complex*1, (int(skip*rx_samp_rate)))
+        self.blocks_head_0 = blocks.head(gr.sizeof_gr_complex*1, (int(cap_len*rx_samp_rate)))
         self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, fname, False)
         self.blocks_file_sink_0.set_unbuffered(True)
+
 
         ##################################################
         # Connections
@@ -59,6 +69,7 @@ class receive_capture(gr.top_block):
         self.connect((self.blocks_head_0, 0), (self.blocks_file_sink_0, 0))
         self.connect((self.blocks_skiphead_0, 0), (self.blocks_head_0, 0))
         self.connect((self.uhd_usrp_source_0, 0), (self.blocks_skiphead_0, 0))
+
 
     def get_args(self):
         return self.args
@@ -71,7 +82,7 @@ class receive_capture(gr.top_block):
 
     def set_cap_len(self, cap_len):
         self.cap_len = cap_len
-        self.blocks_head_0.set_length(int(self.cap_len*self.rx_samp_rate))
+        self.blocks_head_0.set_length((int(self.cap_len*self.rx_samp_rate)))
 
     def get_fname(self):
         return self.fname
@@ -92,8 +103,7 @@ class receive_capture(gr.top_block):
 
     def set_rx_gain(self, rx_gain):
         self.rx_gain = rx_gain
-        self.uhd_usrp_source_0.set_normalized_gain(self.rx_gain, 0)
-
+        self.uhd_usrp_source_0.set_gain(self.rx_gain, 0)
 
     def get_rx_lo_off(self):
         return self.rx_lo_off
@@ -107,8 +117,8 @@ class receive_capture(gr.top_block):
 
     def set_rx_samp_rate(self, rx_samp_rate):
         self.rx_samp_rate = rx_samp_rate
+        self.blocks_head_0.set_length((int(self.cap_len*self.rx_samp_rate)))
         self.uhd_usrp_source_0.set_samp_rate(self.rx_samp_rate)
-        self.blocks_head_0.set_length(int(self.cap_len*self.rx_samp_rate))
 
     def get_skip(self):
         return self.skip
@@ -117,41 +127,46 @@ class receive_capture(gr.top_block):
         self.skip = skip
 
 
+
 def argument_parser():
-    parser = OptionParser(usage="%prog: [options]", option_class=eng_option)
-    parser.add_option(
-        "", "--args", dest="args", type="string", default="addr=192.168.10.2",
-        help="Set args [default=%default]")
-    parser.add_option(
-        "", "--cap-len", dest="cap_len", type="eng_float", default=eng_notation.num_to_str(1),
-        help="Set cap_len [default=%default]")
-    parser.add_option(
-        "", "--fname", dest="fname", type="string", default="received_samples.dat",
-        help="Set received_samples.dat [default=%default]")
-    parser.add_option(
-        "", "--rx-freq", dest="rx_freq", type="eng_float", default=eng_notation.num_to_str(915e6),
-        help="Set rx_freq [default=%default]")
-    parser.add_option(
-        "", "--rx-gain", dest="rx_gain", type="eng_float", default=eng_notation.num_to_str(0.8),
-        help="Set rx_gain [default=%default]")
-    parser.add_option(
-        "", "--rx-lo-off", dest="rx_lo_off", type="eng_float", default=eng_notation.num_to_str(1e6),
-        help="Set rx_lo_off [default=%default]")
-    parser.add_option(
-        "", "--rx-samp-rate", dest="rx_samp_rate", type="eng_float", default=eng_notation.num_to_str(1e6),
-        help="Set rx_samp_rate [default=%default]")
-    parser.add_option(
-        "", "--skip", dest="skip", type="eng_float", default=eng_notation.num_to_str(1),
-        help="Set skip [default=%default]")
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--cap-len", dest="cap_len", type=eng_float, default=eng_notation.num_to_str(float(0.512)),
+        help="Set cap_len [default=%(default)r]")
+    parser.add_argument(
+        "--rx-freq", dest="rx_freq", type=eng_float, default=eng_notation.num_to_str(float(2462e6)),
+        help="Set rx_freq [default=%(default)r]")
+    parser.add_argument(
+        "--rx-gain", dest="rx_gain", type=eng_float, default=eng_notation.num_to_str(float(0.5)),
+        help="Set rx_gain [default=%(default)r]")
+    parser.add_argument(
+        "--rx-lo-off", dest="rx_lo_off", type=eng_float, default=eng_notation.num_to_str(float(10e6)),
+        help="Set rx_lo_off [default=%(default)r]")
+    parser.add_argument(
+        "--rx-samp-rate", dest="rx_samp_rate", type=eng_float, default=eng_notation.num_to_str(float(25e6)),
+        help="Set rx_samp_rate [default=%(default)r]")
+    parser.add_argument(
+        "--skip", dest="skip", type=eng_float, default=eng_notation.num_to_str(float(2)),
+        help="Set skip [default=%(default)r]")
     return parser
 
 
 def main(top_block_cls=receive_capture, options=None):
     if options is None:
-        options, _ = argument_parser().parse_args()
+        options = argument_parser().parse_args()
+    tb = top_block_cls(cap_len=options.cap_len, rx_freq=options.rx_freq, rx_gain=options.rx_gain, rx_lo_off=options.rx_lo_off, rx_samp_rate=options.rx_samp_rate, skip=options.skip)
 
-    tb = top_block_cls(args=options.args, cap_len=options.cap_len, fname=options.fname, rx_freq=options.rx_freq, rx_gain=options.rx_gain, rx_lo_off=options.rx_lo_off, rx_samp_rate=options.rx_samp_rate, skip=options.skip)
+    def sig_handler(sig=None, frame=None):
+        tb.stop()
+        tb.wait()
+
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
+
     tb.start()
+
     tb.wait()
 
 

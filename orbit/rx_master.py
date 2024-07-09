@@ -44,7 +44,8 @@ def node_configure(node_id):
 
     send_command(True, node_id, "sudo add-apt-repository ppa:gnuradio/gnuradio-releases")
     send_command(True, node_id, "apt update")
-    send_command(True, node_id, "apt install uhd-host net-tools libuhd-dev xterm wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0")
+    send_command(True, node_id, "sudo apt install uhd-host net-tools wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0")
+    send_command(True, node_id, "rfkill block wlan")
     send_command(True, node_id, "uhd_find_devices")
     send_command(True, node_id, "iwconfig")
 

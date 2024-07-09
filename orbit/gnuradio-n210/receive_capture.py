@@ -6,12 +6,11 @@
 #
 # GNU Radio Python Flow Graph
 # Title: Receive Capture
-# GNU Radio version: 3.10.9.2
+# GNU Radio version: 3.8.2.0
 
 from gnuradio import blocks
 from gnuradio import gr
 from gnuradio.filter import firdes
-from gnuradio.fft import window
 import sys
 import signal
 from argparse import ArgumentParser
@@ -21,12 +20,10 @@ from gnuradio import uhd
 import time
 
 
-
-
 class receive_capture(gr.top_block):
 
     def __init__(self, cap_len=0.512, device="addr=192.168.10.2", output_file="/root/received_samples.dat", rx_freq=2462e6, rx_gain=0.5, rx_lo_off=10e6, rx_samp_rate=25e6, skip=2):
-        gr.top_block.__init__(self, "Receive Capture", catch_exceptions=True)
+        gr.top_block.__init__(self, "Receive Capture")
 
         ##################################################
         # Parameters
@@ -43,7 +40,6 @@ class receive_capture(gr.top_block):
         ##################################################
         # Blocks
         ##################################################
-
         self.uhd_usrp_source_0 = uhd.usrp_source(
             ",".join(('args', "")),
             uhd.stream_args(
@@ -52,15 +48,15 @@ class receive_capture(gr.top_block):
                 channels=list(range(0,1)),
             ),
         )
-        self.uhd_usrp_source_0.set_samp_rate(rx_samp_rate)
-        # No synchronization enforced.
-
         self.uhd_usrp_source_0.set_center_freq(uhd.tune_request(rx_freq,rx_lo_off), 0)
         self.uhd_usrp_source_0.set_gain(rx_gain, 0)
-        self.blocks_skiphead_0 = blocks.skiphead(gr.sizeof_gr_complex*1, (int(skip*rx_samp_rate)))
-        self.blocks_head_0 = blocks.head(gr.sizeof_gr_complex*1, (int(cap_len*rx_samp_rate)))
+        self.uhd_usrp_source_0.set_samp_rate(rx_samp_rate)
+        # No synchronization enforced.
+        self.blocks_skiphead_0 = blocks.skiphead(gr.sizeof_gr_complex*1, int(skip*rx_samp_rate))
+        self.blocks_head_0 = blocks.head(gr.sizeof_gr_complex*1, int(cap_len*rx_samp_rate))
         self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, output_file, False)
         self.blocks_file_sink_0.set_unbuffered(True)
+
 
 
         ##################################################
@@ -76,7 +72,7 @@ class receive_capture(gr.top_block):
 
     def set_cap_len(self, cap_len):
         self.cap_len = cap_len
-        self.blocks_head_0.set_length((int(self.cap_len*self.rx_samp_rate)))
+        self.blocks_head_0.set_length(int(self.cap_len*self.rx_samp_rate))
 
     def get_device(self):
         return self.device
@@ -117,7 +113,7 @@ class receive_capture(gr.top_block):
 
     def set_rx_samp_rate(self, rx_samp_rate):
         self.rx_samp_rate = rx_samp_rate
-        self.blocks_head_0.set_length((int(self.cap_len*self.rx_samp_rate)))
+        self.blocks_head_0.set_length(int(self.cap_len*self.rx_samp_rate))
         self.uhd_usrp_source_0.set_samp_rate(self.rx_samp_rate)
 
     def get_skip(self):
@@ -128,10 +124,11 @@ class receive_capture(gr.top_block):
 
 
 
+
 def argument_parser():
     parser = ArgumentParser()
     parser.add_argument(
-        "--cap-len", dest="cap_len", type=eng_float, default=eng_notation.num_to_str(float(0.512)),
+        "--cap-len", dest="cap_len", type=eng_float, default="512.0m",
         help="Set cap_len [default=%(default)r]")
     parser.add_argument(
         "--device", dest="device", type=str, default="addr=192.168.10.2",
@@ -140,19 +137,19 @@ def argument_parser():
         "--output-file", dest="output_file", type=str, default="/root/received_samples.dat",
         help="Set /root/received_samples.dat [default=%(default)r]")
     parser.add_argument(
-        "--rx-freq", dest="rx_freq", type=eng_float, default=eng_notation.num_to_str(float(2462e6)),
+        "--rx-freq", dest="rx_freq", type=eng_float, default="2.462G",
         help="Set rx_freq [default=%(default)r]")
     parser.add_argument(
-        "--rx-gain", dest="rx_gain", type=eng_float, default=eng_notation.num_to_str(float(0.5)),
+        "--rx-gain", dest="rx_gain", type=eng_float, default="500.0m",
         help="Set rx_gain [default=%(default)r]")
     parser.add_argument(
-        "--rx-lo-off", dest="rx_lo_off", type=eng_float, default=eng_notation.num_to_str(float(10e6)),
+        "--rx-lo-off", dest="rx_lo_off", type=eng_float, default="10.0M",
         help="Set rx_lo_off [default=%(default)r]")
     parser.add_argument(
-        "--rx-samp-rate", dest="rx_samp_rate", type=eng_float, default=eng_notation.num_to_str(float(25e6)),
+        "--rx-samp-rate", dest="rx_samp_rate", type=eng_float, default="25.0M",
         help="Set rx_samp_rate [default=%(default)r]")
     parser.add_argument(
-        "--skip", dest="skip", type=eng_float, default=eng_notation.num_to_str(float(2)),
+        "--skip", dest="skip", type=eng_float, default="2.0",
         help="Set skip [default=%(default)r]")
     return parser
 

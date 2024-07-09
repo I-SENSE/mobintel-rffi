@@ -70,22 +70,21 @@ def node_configure(node_id):
     print('Configure done')
 
 def node_capture(tx_node_id, rx_node_id, local_dir):
+    # 0. Remove any residual files, if any
+    send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
+
     # 1. Launch capture
-    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --args=\"{RX_USRP_ARGS}\" --cap_len={RX_CAP_LEN} --fname=\"{CORE_RX_FILE}\" --rx_freq={RX_FREQ} --rx_gain={RX_GAIN} --rx_lo_off={RX_LO_OFF} --rx_samp_rate={RX_SAMP_RATE} --skip={RX_SKIP}')
+    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --device=\"{RX_USRP_ARGS}\" --cap-len={RX_CAP_LEN} --output-file=\"{CORE_RX_FILE}\" --rx-freq={RX_FREQ} --rx-gain={RX_GAIN} --rx-lo-off={RX_LO_OFF} --rx-samp-rate={RX_SAMP_RATE} --skip={RX_SKIP}')
 
-    # 2. Stop capture (kill tmux)
-    # TODO
-
-    # 3. Download file to local device
-    filename = f"tx{{node/{tx_node_id}}}_rx{{node/{rx_node_id}-rxFreq/{RX_FREQ}-rxGain/{RX_GAIN}-capLen/{RX_CAP_LEN}-rxSampRate/{RX_SAMP_RATE}}}.dat"
+    # 2. Download file to local device
+    filename = f"tx{{node_{tx_node_id}}}_rx{{node_{rx_node_id}+rxFreq_{RX_FREQ}+rxGain_{RX_GAIN}+capLen_{RX_CAP_LEN}+rxSampRate_{RX_SAMP_RATE}}}.dat"
     path_local = os.path.join(local_dir, filename)
     command = f"scp -J {JUMP_NODE_GRID} root@{rx_node_id}:{CORE_RX_FILE} {path_local}"
     print(command)
-    # os.system(command)
+    os.system(command)
 
-    # 4. Delete file remotely
+    # 3. Delete file on the node
     send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
-
     print('Capture done')
 
 def mode_rx(node_ids, local_folder, tx_node_id):

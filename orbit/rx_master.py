@@ -67,7 +67,7 @@ def node_configure(node_id):
 
 def node_capture(tx_node_id, rx_node_id, local_dir):
     # 1. Launch capture
-    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --args="{RX_USRP_ARGS}" --cap_len={RX_CAP_LEN} --fname={CORE_RX_FILE} --rx_freq={RX_FREQ} --rx_gain={RX_GAIN} --rx_lo_off={RX_LO_OFF} --rx_samp_rate={RX_SAMP_RATE} --skip={RX_SKIP}')
+    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --args="{RX_USRP_ARGS}" --cap_len={RX_CAP_LEN} --fname="{CORE_RX_FILE}" --rx_freq={RX_FREQ} --rx_gain={RX_GAIN} --rx_lo_off={RX_LO_OFF} --rx_samp_rate={RX_SAMP_RATE} --skip={RX_SKIP}')
 
     # 2. Stop capture (kill tmux)
     # TODO

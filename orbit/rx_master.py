@@ -17,6 +17,9 @@ RX_LO_OFF = "10e6"
 
 RX_NODES = ["node1-2"] # TODO: determine RX node IDs
 
+def generate_dir_name():
+    return time.strftime("epoch_%Y-%m-%d_%H-%M-%S", time.localtime())
+
 def send_command(needsJump, node, command):
     if needsJump: 
         cmd = "ssh -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
@@ -139,6 +142,10 @@ def main():
     if not os.path.exists(rootFolder):
         print("Root folder doesn't exist. We'll create it.")
         os.mkdir(rootFolder)
+
+    rootFolder = os.path.join(rootFolder, generate_dir_name())
+
+    os.mkdir(rootFolder)
 
     print("OK, we'll work here: " + rootFolder)
 

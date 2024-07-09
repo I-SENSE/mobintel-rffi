@@ -33,23 +33,6 @@ options:
     state: enabled
 
 blocks:
-- name: args
-  id: parameter
-  parameters:
-    alias: ''
-    comment: ''
-    hide: none
-    label: '"args"'
-    short_id: ''
-    type: ''
-    value: '"addr=192.168.10.2"'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [152, 12.0]
-    rotation: 0
-    state: enabled
 - name: blocks_file_sink_0
   id: blocks_file_sink
   parameters:
@@ -57,7 +40,7 @@ blocks:
     alias: ''
     append: 'False'
     comment: ''
-    file: fname
+    file: output_file
     type: complex
     unbuffered: 'True'
     vlen: '1'
@@ -121,21 +104,21 @@ blocks:
     coordinate: [616, 8.0]
     rotation: 0
     state: enabled
-- name: fname
+- name: device
   id: parameter
   parameters:
     alias: ''
     comment: ''
     hide: none
-    label: fname
+    label: '"device"'
     short_id: ''
-    type: ''
-    value: '"/root/received_samples.dat"'
+    type: str
+    value: '"addr=192.168.10.2"'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [688, 12.0]
+    coordinate: [152, 12.0]
     rotation: 0
     state: enabled
 - name: import_0
@@ -149,6 +132,23 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [8, 72.0]
+    rotation: 0
+    state: enabled
+- name: output_file
+  id: parameter
+  parameters:
+    alias: ''
+    comment: ''
+    hide: none
+    label: output_file
+    short_id: ''
+    type: str
+    value: '"/root/received_samples.dat"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [688, 8.0]
     rotation: 0
     state: enabled
 - name: rx_freq
@@ -379,38 +379,38 @@ blocks:
     dc_offs7: 0+0j
     dc_offs8: 0+0j
     dc_offs9: 0+0j
-    dc_offs_enb0: True
-    dc_offs_enb1: True
-    dc_offs_enb10: True
-    dc_offs_enb11: True
-    dc_offs_enb12: True
-    dc_offs_enb13: True
-    dc_offs_enb14: True
-    dc_offs_enb15: True
-    dc_offs_enb16: True
-    dc_offs_enb17: True
-    dc_offs_enb18: True
-    dc_offs_enb19: True
-    dc_offs_enb2: True
-    dc_offs_enb20: True
-    dc_offs_enb21: True
-    dc_offs_enb22: True
-    dc_offs_enb23: True
-    dc_offs_enb24: True
-    dc_offs_enb25: True
-    dc_offs_enb26: True
-    dc_offs_enb27: True
-    dc_offs_enb28: True
-    dc_offs_enb29: True
-    dc_offs_enb3: True
-    dc_offs_enb30: True
-    dc_offs_enb31: True
-    dc_offs_enb4: True
-    dc_offs_enb5: True
-    dc_offs_enb6: True
-    dc_offs_enb7: True
-    dc_offs_enb8: True
-    dc_offs_enb9: True
+    dc_offs_enb0: true
+    dc_offs_enb1: true
+    dc_offs_enb10: true
+    dc_offs_enb11: true
+    dc_offs_enb12: true
+    dc_offs_enb13: true
+    dc_offs_enb14: true
+    dc_offs_enb15: true
+    dc_offs_enb16: true
+    dc_offs_enb17: true
+    dc_offs_enb18: true
+    dc_offs_enb19: true
+    dc_offs_enb2: true
+    dc_offs_enb20: true
+    dc_offs_enb21: true
+    dc_offs_enb22: true
+    dc_offs_enb23: true
+    dc_offs_enb24: true
+    dc_offs_enb25: true
+    dc_offs_enb26: true
+    dc_offs_enb27: true
+    dc_offs_enb28: true
+    dc_offs_enb29: true
+    dc_offs_enb3: true
+    dc_offs_enb30: true
+    dc_offs_enb31: true
+    dc_offs_enb4: true
+    dc_offs_enb5: true
+    dc_offs_enb6: true
+    dc_offs_enb7: true
+    dc_offs_enb8: true
+    dc_offs_enb9: true
     dev_addr: args
     dev_args: '""'
     gain0: rx_gain
@@ -509,38 +509,38 @@ blocks:
     iq_imbal7: 0+0j
     iq_imbal8: 0+0j
     iq_imbal9: 0+0j
-    iq_imbal_enb0: True
-    iq_imbal_enb1: True
-    iq_imbal_enb10: True
-    iq_imbal_enb11: True
-    iq_imbal_enb12: True
-    iq_imbal_enb13: True
-    iq_imbal_enb14: True
-    iq_imbal_enb15: True
-    iq_imbal_enb16: True
-    iq_imbal_enb17: True
-    iq_imbal_enb18: True
-    iq_imbal_enb19: True
-    iq_imbal_enb2: True
-    iq_imbal_enb20: True
-    iq_imbal_enb21: True
-    iq_imbal_enb22: True
-    iq_imbal_enb23: True
-    iq_imbal_enb24: True
-    iq_imbal_enb25: True
-    iq_imbal_enb26: True
-    iq_imbal_enb27: True
-    iq_imbal_enb28: True
-    iq_imbal_enb29: True
-    iq_imbal_enb3: True
-    iq_imbal_enb30: True
-    iq_imbal_enb31: True
-    iq_imbal_enb4: True
-    iq_imbal_enb5: True
-    iq_imbal_enb6: True
-    iq_imbal_enb7: True
-    iq_imbal_enb8: True
-    iq_imbal_enb9: True
+    iq_imbal_enb0: true
+    iq_imbal_enb1: true
+    iq_imbal_enb10: true
+    iq_imbal_enb11: true
+    iq_imbal_enb12: true
+    iq_imbal_enb13: true
+    iq_imbal_enb14: true
+    iq_imbal_enb15: true
+    iq_imbal_enb16: true
+    iq_imbal_enb17: true
+    iq_imbal_enb18: true
+    iq_imbal_enb19: true
+    iq_imbal_enb2: true
+    iq_imbal_enb20: true
+    iq_imbal_enb21: true
+    iq_imbal_enb22: true
+    iq_imbal_enb23: true
+    iq_imbal_enb24: true
+    iq_imbal_enb25: true
+    iq_imbal_enb26: true
+    iq_imbal_enb27: true
+    iq_imbal_enb28: true
+    iq_imbal_enb29: true
+    iq_imbal_enb3: true
+    iq_imbal_enb30: true
+    iq_imbal_enb31: true
+    iq_imbal_enb4: true
+    iq_imbal_enb5: true
+    iq_imbal_enb6: true
+    iq_imbal_enb7: true
+    iq_imbal_enb8: true
+    iq_imbal_enb9: trueult
     lo_export0: 'False'
     lo_export1: 'False'
     lo_export10: 'False'

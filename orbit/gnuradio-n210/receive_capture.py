@@ -25,15 +25,15 @@ import time
 
 class receive_capture(gr.top_block):
 
-    def __init__(self, args="addr=192.168.10.2", cap_len=0.512, fname="/root/received_samples.dat", rx_freq=2462e6, rx_gain=0.5, rx_lo_off=10e6, rx_samp_rate=25e6, skip=2):
+    def __init__(self, cap_len=0.512, device="addr=192.168.10.2", output_file="/root/received_samples.dat", rx_freq=2462e6, rx_gain=0.5, rx_lo_off=10e6, rx_samp_rate=25e6, skip=2):
         gr.top_block.__init__(self, "Receive Capture", catch_exceptions=True)
 
         ##################################################
         # Parameters
         ##################################################
-        self.args = args
         self.cap_len = cap_len
-        self.fname = fname
+        self.device = device
+        self.output_file = output_file
         self.rx_freq = rx_freq
         self.rx_gain = rx_gain
         self.rx_lo_off = rx_lo_off
@@ -45,7 +45,7 @@ class receive_capture(gr.top_block):
         ##################################################
 
         self.uhd_usrp_source_0 = uhd.usrp_source(
-            ",".join((args, "")),
+            ",".join(('args', "")),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -59,7 +59,7 @@ class receive_capture(gr.top_block):
         self.uhd_usrp_source_0.set_gain(rx_gain, 0)
         self.blocks_skiphead_0 = blocks.skiphead(gr.sizeof_gr_complex*1, (int(skip*rx_samp_rate)))
         self.blocks_head_0 = blocks.head(gr.sizeof_gr_complex*1, (int(cap_len*rx_samp_rate)))
-        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, fname, False)
+        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, output_file, False)
         self.blocks_file_sink_0.set_unbuffered(True)
 
 
@@ -71,12 +71,6 @@ class receive_capture(gr.top_block):
         self.connect((self.uhd_usrp_source_0, 0), (self.blocks_skiphead_0, 0))
 
 
-    def get_args(self):
-        return self.args
-
-    def set_args(self, args):
-        self.args = args
-
     def get_cap_len(self):
         return self.cap_len
 
@@ -84,12 +78,18 @@ class receive_capture(gr.top_block):
         self.cap_len = cap_len
         self.blocks_head_0.set_length((int(self.cap_len*self.rx_samp_rate)))
 
-    def get_fname(self):
-        return self.fname
+    def get_device(self):
+        return self.device
 
-    def set_fname(self, fname):
-        self.fname = fname
-        self.blocks_file_sink_0.open(self.fname)
+    def set_device(self, device):
+        self.device = device
+
+    def get_output_file(self):
+        return self.output_file
+
+    def set_output_file(self, output_file):
+        self.output_file = output_file
+        self.blocks_file_sink_0.open(self.output_file)
 
     def get_rx_freq(self):
         return self.rx_freq
@@ -134,6 +134,12 @@ def argument_parser():
         "--cap-len", dest="cap_len", type=eng_float, default=eng_notation.num_to_str(float(0.512)),
         help="Set cap_len [default=%(default)r]")
     parser.add_argument(
+        "--device", dest="device", type=str, default="addr=192.168.10.2",
+        help="Set device [default=%(default)r]")
+    parser.add_argument(
+        "--output-file", dest="output_file", type=str, default="/root/received_samples.dat",
+        help="Set /root/received_samples.dat [default=%(default)r]")
+    parser.add_argument(
         "--rx-freq", dest="rx_freq", type=eng_float, default=eng_notation.num_to_str(float(2462e6)),
         help="Set rx_freq [default=%(default)r]")
     parser.add_argument(
@@ -154,7 +160,7 @@ def argument_parser():
 def main(top_block_cls=receive_capture, options=None):
     if options is None:
         options = argument_parser().parse_args()
-    tb = top_block_cls(cap_len=options.cap_len, rx_freq=options.rx_freq, rx_gain=options.rx_gain, rx_lo_off=options.rx_lo_off, rx_samp_rate=options.rx_samp_rate, skip=options.skip)
+    tb = top_block_cls(cap_len=options.cap_len, device=options.device, output_file=options.output_file, rx_freq=options.rx_freq, rx_gain=options.rx_gain, rx_lo_off=options.rx_lo_off, rx_samp_rate=options.rx_samp_rate, skip=options.skip)
 
     def sig_handler(sig=None, frame=None):
         tb.stop()

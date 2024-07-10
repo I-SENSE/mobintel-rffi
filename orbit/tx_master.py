@@ -4,6 +4,15 @@ import subprocess
 from multiprocessing import Process
 from collections import deque
 
+JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
+# JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
+
+TX_INTERVAL = "0.5" # Interval (in seconds) between injected probe requests
+TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
+TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
+TX_CHANNEL = 5 # Channel ID on which we'll be sending our probes [1 -- 13]
+TX_INTERFACE = "wlp6s8mon" # Default name of the interface we'll set in monitor mode
+
 TX_NODES_TRAIN = ["node7-10", "node7-11", "node7-14", "node1-10", "node1-12", "node8-3", "node1-16", "node1-18",
                 "node1-19", "node8-8", "node2-6", "node8-18", "node8-20", "node2-19", "node3-13", "node3-18",
                 "node10-7", "node4-1", "node10-11", "node10-17", "node4-10", "node4-11", "node11-1", "node11-4",
@@ -11,9 +20,6 @@ TX_NODES_TRAIN = ["node7-10", "node7-11", "node7-14", "node1-10", "node1-12", "n
                 
 TX_NODES_TEST = ["node20-12", "node19-1", "node17-10", "node14-7", "node17-11", "node16-1", "node14-10", 
                  "node20-15", "node12-20", "node20-19", "node13-3", "node15-1", "node19-19", "node16-16", "node20-1"]
-
-# JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org"
-JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
 
 def send_command(needsJump, node, command):
     if needsJump: 
@@ -46,7 +52,7 @@ def node_configure(node_id):
 
     print('Configured.')
 
-def node_emit(node_id, interface="wlp6s8mon", channel=11, mac="11:22:33:44:55:66", ssid="smazokha", interval="0.1"):
+def node_emit(node_id, interface=TX_INTERFACE, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, interval=TX_INTERVAL):
     send_command(True, node_id, "rfkill unblock wlan")
     
     while True:
@@ -56,12 +62,18 @@ def node_emit(node_id, interface="wlp6s8mon", channel=11, mac="11:22:33:44:55:66
         send_command(True, node_id, f"airmon-ng start {interface}")
         send_command(True, node_id, "tmux kill-session -t emit")
 
-        # Note: probe emission code has been developed by Fanchen for one of our previous projects. 
-        # But this code provides an easy interface for emitting probe requests. 
-        # Importantly, the probes will be emitted for as long as the tmux sesh is running. 
-        # So, that's why we need to kill the session once we captured our data on the RX side.
-        
-        # TODO: determine most optimal interval for probe emission. Update the matlab IQ parser accordingly.
+        # Note #1: probe emission code has been developed by Fanchen for one of our previous projects. 
+        #          But this code provides an easy interface for emitting probe requests. 
+        #          Importantly, the probes will be emitted for as long as the tmux sesh is running. 
+        #          So, that's why we need to kill the session once we captured our data on the RX side.
+        # 
+        # Note #2: The TX power functionality of the Fanchen's repo is not applicable in our case. We 
+        #          cannot change TX power on the grid, because the Atheros chipsets we can use has the
+        #          regional power limits written in EEPROM. Therefore, any attempts to change the TX 
+        #          power won't work.
+        #          Ref: https://wiki.archlinux.org/title/Network_configuration/Wireless#:~:text=However%2C%20setting%20the,maximum%20of%2030dBm
+        # 
+        # TODO:    Determine most optimal interval for probe emission. Update the matlab IQ parser accordingly.
         send_command(True, node_id, f"/root/probe_request_injection/emit/emit.sh -i {interface}mon -c {channel} --mac {mac} --interval {interval} --ssid {ssid}")
 
         command = input("What now? [emit/enter (to stop)]")

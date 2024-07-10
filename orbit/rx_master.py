@@ -1,21 +1,25 @@
 import os
 import time
 
-# JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org"
-JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
+OFDM_CENTER_FREQ = ["2412e6", "2417e6", "2422e6", "2427e6", "2432e6", "2437e6", "2442e6", "2447e6", "2452e6", "2457e6", "2462e6", "2467e6", "2472e6"]
+
+JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # node via which we're connecting to the Grid
+# JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
 
 CORE_LOCAL_FOLDER = "/Users/stepanmazokha/Desktop/"
 CORE_RX_FILE = "/root/samples.dat"
+RX_NODES = ["node1-1"]
 
-RX_USRP_ARGS = "addr=192.168.10.2"
-RX_FREQ = "2462e6"
-RX_GAIN = "0.5"
-RX_CAP_LEN = "0.512"
-RX_SAMP_RATE = "25e6"
-RX_SKIP = "2"
-RX_LO_OFF = "10e6"
-
-RX_NODES = ["node1-2"] # TODO: determine RX node IDs
+RX_CHANNEL_IDX = 5 # 1-based value, according to 802.11 standard
+RX_USRP_IP = "addr=192.168.10.2"
+RX_FREQ = OFDM_CENTER_FREQ[RX_CHANNEL_IDX - 1]
+RX_GAIN = "0.5" # Chx Gain Value, Absolute (dB), range (for SBX): 0 - 31.5 dB
+RX_SAMP_RATE = "25e6" # Sampling rate, should be at least 20 Msps
+RX_SKIP = "2" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RATE
+# RX_CAP_LEN = "0.512"
+RX_CAP_LEN = "1" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE
+# RX_LO_OFF = "10e6"
+RX_LO_OFF = "0" # If the center freq is crowded, we can optionally tune it up (WiSig had it at 10 MHz)
 
 def generate_dir_name():
     return time.strftime("epoch_%Y-%m-%d_%H-%M-%S", time.localtime())
@@ -44,7 +48,7 @@ def node_configure(node_id):
 
     send_command(True, node_id, "sudo add-apt-repository ppa:gnuradio/gnuradio-releases")
     send_command(True, node_id, "apt update")
-    send_command(True, node_id, "sudo apt install uhd-host net-tools wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0")
+    send_command(True, node_id, "sudo apt install uhd-host net-tools wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0 rfkill")
     send_command(True, node_id, "rfkill block wlan")
     send_command(True, node_id, "uhd_find_devices")
     send_command(True, node_id, "iwconfig")
@@ -53,7 +57,7 @@ def node_configure(node_id):
         instruction = input("Do we need to configure IP address to USRP? [Y/n]")
 
         if instruction == 'Y':
-            interface = input("Which interface should we use? (eth2 recommended)")
+            interface = input("Which interface should we use? (eth2 or DATA2 recommended)")
             send_command(True, node_id, f"ifconfig {interface} 192.168.10.1 netmask 255.255.255.0 up")
             send_command(True, node_id, "uhd_find_devices")
 
@@ -64,7 +68,7 @@ def node_configure(node_id):
             break
         else: print("Invalid command")
 
-    send_command(True, node_id, f'/usr/lib/uhd/examples/test_pps_input --args=\"{RX_USRP_ARGS}\" --source external')
+    send_command(True, node_id, f'/usr/lib/uhd/examples/test_pps_input --args=\"{RX_USRP_IP}\" --source external')
 
     send_command(True, node_id, "cd /root/ && git clone https://github.com/i-sense/mobintel-rffi && mv /root/mobintel-rffi/orbit/gnuradio-n210 /root/ && rm -rf /root/mobintel-rffi")
 
@@ -75,7 +79,7 @@ def node_capture(tx_node_id, rx_node_id, local_dir):
     send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
 
     # 1. Launch capture
-    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --device=\"{RX_USRP_ARGS}\" --cap-len={RX_CAP_LEN} --output-file=\"{CORE_RX_FILE}\" --rx-freq={RX_FREQ} --rx-gain={RX_GAIN} --rx-lo-off={RX_LO_OFF} --rx-samp-rate={RX_SAMP_RATE} --skip={RX_SKIP}')
+    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --device=\"{RX_USRP_IP}\" --cap-len={RX_CAP_LEN} --output-file=\"{CORE_RX_FILE}\" --rx-freq={RX_FREQ} --rx-gain={RX_GAIN} --rx-lo-off={RX_LO_OFF} --rx-samp-rate={RX_SAMP_RATE} --skip={RX_SKIP}')
 
     # 2. Download file to local device
     filename = f"tx{{node_{tx_node_id}}}_rx{{node_{rx_node_id}+rxFreq_{RX_FREQ}+rxGain_{RX_GAIN}+capLen_{RX_CAP_LEN}+rxSampRate_{RX_SAMP_RATE}}}.dat"

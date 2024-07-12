@@ -4,14 +4,19 @@ import subprocess
 from multiprocessing import Process
 from collections import deque
 
+# TX command: cat /dev/urandom | netcat -u 192.168.16.1 55555
+# RX command: rm -rf /root/temp_node.dat && netcat -lu  192.168.16.1 55555 > "/root/temp_node.dat"
+
 JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
 # JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
 
 TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
 TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
-TX_CHANNEL = 8 # Channel ID on which we'll be sending our probes [1 -- 13]
+TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 TX_INTERFACE = "wlp6s8mon" # Default name of the interface we'll set in monitor mode
+
+AP_NODE = "node1-2"
 
 TX_NODES_TRAIN = ["node7-10", "node7-11", "node7-14", "node1-10", "node1-12", "node8-3", "node1-16", "node1-18",
                 "node1-19", "node8-8", "node2-6", "node8-18", "node8-20", "node2-19", "node3-13", "node3-18",
@@ -30,7 +35,7 @@ def send_command(needsJump, node, command):
     print(cmd)
     os.system(cmd)
 
-def node_configure(node_id):
+def node_configure_ap(node_id):
     send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
@@ -44,109 +49,150 @@ def node_configure(node_id):
             break
 
     send_command(True, node_id, "apt update")
-    send_command(True, node_id, "apt install network-manager net-tools hostapd wireless-tools tmux python3-pip aircrack-ng git")
-    send_command(True, node_id, "pip3 install scapy")
+    send_command(True, node_id, "apt install network-manager wireless-tools net-tools hostapd wireless-tools tmux rfkill socat")
     send_command(True, node_id, "modprobe ath5k")
-    send_command(True, node_id, "rfkill block wlan")
-    send_command(True, node_id, "cd /root && git clone https://github.com/FanchenBao/probe_request_injection")
-
-    print('Configured.')
-
-def node_emit(node_id, interface=TX_INTERFACE, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, interval=TX_INTERVAL):
-    send_command(True, node_id, "rfkill unblock wlan")
+    send_command(True, node_id, "iwconfig")
     
+    interface = input("Which interface should we use?")
+
+    command_hostapd = f"""
+sudo bash -c 'cat <<EOF > /etc/hostapd/hostapd.conf
+interface={interface}
+driver=nl80211
+ssid=mobloc_wlan
+hw_mode=g
+channel={TX_CHANNEL}
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=P@ssw0rd123
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
+EOF'
+"""
+    send_command(True, node_id, command_hostapd)
+    send_command(True, node_id, 'DAEMON_CONF="/etc/hostapd/hostapd.conf"')
+    send_command(True, node_id, "systemctl unmask hostapd && systemctl enable hostapd")
+
+    command_default_hostapd = """
+sudo bash -c 'cat <<EOF > /etc/default/hostapd
+# Defaults for hostapd initscript
+#
+# See /usr/share/doc/hostapd/README.Debian for information about alternative
+# methods of managing hostapd.
+#
+# Uncomment and set DAEMON_CONF to the absolute path of a hostapd configuration
+# file and hostapd will be started during system boot. An example configuration
+# file can be found at /usr/share/doc/hostapd/examples/hostapd.conf.gz
+#
+DAEMON_CONF=\\"/etc/hostapd/hostapd.conf\\"
+
+# Additional daemon options to be appended to hostapd command:-
+#       -d   show more debug messages (-dd for even more)
+#       -K   include key data in debug messages
+#       -t   include timestamps in some debug messages
+#
+# Note that -B (daemon mode) and -P (pidfile) options are automatically
+# configured by the init.d script and must not be added to DAEMON_OPTS.
+#
+#DAEMON_OPTS=""
+EOF'
+"""
+    send_command(True, node_id, command_default_hostapd)
+    send_command(True, node_id, "systemctl restart hostapd")
+    send_command(True, node_id, f"ifconfig {interface} 192.168.16.1 netmask 255.255.255.0")
+
+    print("AP setup complete.")
+
+def node_configure_tx(node_id):
+    send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
+
     while True:
-        send_command(True, node_id, "iwconfig")
-        interface = input("What interface should we use?")
+        input('Hit enter when ready to proceed')
+        send_command(True, node_id, "ls /root/")
 
-        send_command(True, node_id, f"airmon-ng start {interface}")
-        send_command(True, node_id, "tmux kill-session -t emit")
-
-        # Note #1: probe emission code has been developed by Fanchen for one of our previous projects. 
-        #          But this code provides an easy interface for emitting probe requests. 
-        #          Importantly, the probes will be emitted for as long as the tmux sesh is running. 
-        #          So, that's why we need to kill the session once we captured our data on the RX side.
-        # 
-        # Note #2: The TX power functionality of the Fanchen's repo is not applicable in our case. We 
-        #          cannot change TX power on the grid, because the Atheros chipsets we can use has the
-        #          regional power limits written in EEPROM. Therefore, any attempts to change the TX 
-        #          power won't work.
-        #          Ref: https://wiki.archlinux.org/title/Network_configuration/Wireless#:~:text=However%2C%20setting%20the,maximum%20of%2030dBm
-        # 
-        # TODO:    Determine most optimal interval for probe emission. Update the matlab IQ parser accordingly.
-        send_command(True, node_id, f"/root/probe_request_injection/emit/emit.sh -i {interface}mon -c {channel} --mac {mac} --interval {interval} --ssid {ssid}")
-
-        command = input("What now? [emit/enter (to stop)]")
-
-        if command == 'emit':
-            continue
-        else: 
-            send_command(True, node_id, f"airmon-ng stop {interface}mon")
+        instruction = input("Were you able to get a response? [Y/n]")
+        if instruction == 'Y':
             break
 
-    send_command(True, node_id, "tmux kill-session -t emit")
+    send_command(True, node_id, "apt update")
+    send_command(True, node_id, "apt install net-tools network-manager hostapd wireless-tools rfkill tmux socat")
+    send_command(True, node_id, "modprobe ath5k")
+    send_command(True, node_id, "iwconfig")
+
+    interface = input("Which interface should we use?")
+
+    send_command(True, node_id, f"ip link set {interface} up")
+    send_command(True, node_id, "systemctl start network-manager")
+    send_command(True, node_id, f"nmcli connection add type wifi con-name mobloc ifname {interface} mac \$(cat /sys/class/net/{interface}/address) ssid mobloc_wlan mode infra ip4 192.168.16.12/24")
+    send_command(True, node_id, "nmcli con modify mobloc 802-11-wireless-security.key-mgmt wpa-psk  wifi-sec.psk P@ssw0rd123")
     send_command(True, node_id, "rfkill block wlan")
-
-def mode_emit(tx_nodes):
-    if len(tx_nodes) == 0:
-        print('No nodes to emit from.')
-        return
-
-    node_idx = 0
-    while node_idx < len(tx_nodes):
-        node_id = tx_nodes[node_idx]
-        instruction = input('Ready to emit from ' + node_id + "? [Y/skip]")
-
-        if instruction == 'Y':
-            node_emit(node_id)
-            
-            instruction = input('Emission is over. Move to next device? [Y/n]')
-            if instruction == 'Y':
-                node_idx = node_idx + 1
-            
-        elif instruction == 'skip':
-            node_idx = node_idx + 1
-        else: print('Invalid command.')
-
-    print('Done')
-
-def mode_config(nodes):
-    if len(nodes) == 0:
-        print('No nodes to emit from.')
-        return
+    print("TX setup complete.")
     
-    node_idx = 0
-    while node_idx < len(nodes):
-        node_id = nodes[node_idx]
+def node_transmit(tx_node_id, ap_node_id):
+    send_command(True, tx_node_id, "rfkill unblock wlan")
 
-        instruction = input('Ready to configure ' + node_id + "? [Y/skip/done]")
-
-        if instruction == 'Y':
-            node_configure(node_id)
-            node_idx = node_idx + 1
-        elif instruction == 'skip':
-            node_idx = node_idx + 1
-        elif instruction == 'done':
+    while True:
+        input("Hit when you're ready to check for WiFi availability...")
+        send_command(True, tx_node_id, "nmcli dev wifi")
+        answer = input("Do you see WiFi network 'mobloc_wlan'? [Y/n]")
+        if answer == 'Y':
             break
-        else: 
-            print('Invalid command')
+
+    send_command(True, tx_node_id, "nmcli connection up mobloc")
+    send_command(True, tx_node_id, "ping 192.168.16.1 -c 2")
+
+    input("Ready to start transmission?")
+
+    send_command(True, ap_node_id, "rm -rf /root/temp_node.dat")
+    
+    # command_tx_start = "tmux new-session -d -s emit 'cat /dev/urandom | netcat -u 192.168.16.1 55555'"
+    # command_ap_start = "tmux new-session -d -s receive 'netcat -lu  192.168.16.1 55555 > \"/root/temp_node.dat\"'"
+
+    command_tx_start = "tmux new-session -d -s emit 'cat /dev/urandom | socat - UDP-SENDTO:192.168.16.1:55555'"
+    command_ap_start = "tmux new-session -d -s receive 'socat - UDP-RECV:55555 > \"/root/temp_node.dat\"'"
+
+    command_tx_stop = "tmux kill-session -t emit"
+    command_ap_stop = "tmux kill-session -t receive"
+
+    send_command(True, ap_node_id, command_ap_start)
+    time.sleep(2) # let AP set up the receival
+    send_command(True, tx_node_id, command_tx_start)
+
+    input("Transmission is in progress. Start reception. Hit to stop.")
+    send_command(True, ap_node_id, command_ap_stop)
+    send_command(True, ap_node_id, command_tx_stop)
+    send_command(True, tx_node_id, "rfkill block wlan")
+    send_command(True, ap_node_id, "rm -rf /root/temp_node.dat")
+
+    print("Transmission complete.")
+
+#################
+
 
 def main():
     print("Welcome!. Let's get started.")
     while True:
-        tx_type = input("What should we do? [config | config one | emit train | emit test | emit one] ")
-        if tx_type == 'config':
-            mode_config(TX_NODES_TRAIN + TX_NODES_TEST)
-        elif tx_type == 'config one':
-            node_id = input('Type node ID (nodeX-Y): ')
-            mode_config([node_id])
-        elif tx_type == 'emit train':
-            mode_emit(TX_NODES_TRAIN)
-        elif tx_type == 'emit test':
-            mode_emit(TX_NODES_TEST)
-        elif tx_type == 'emit one':
-            node_id = input('Type node ID (nodeX-Y): ')
-            mode_emit([node_id])
+        tx_type = input("What should we do? [config tx | config ap | emit one] ")
+
+        if tx_type == "config tx":
+            node_id = input("TX node ID: ")
+            node_configure_tx(node_id)
+
+        elif tx_type == "config ap":
+            node_id = input("AP node ID: ")
+            node_configure_ap(node_id)
+
+        elif tx_type == "emit one":
+            tx_node_id = input("TX node ID: ")
+            ap_node_id = input("AP node ID: ")
+            node_transmit(tx_node_id, ap_node_id)
+
         else: print("Wrong command.")
         
 if __name__ == "__main__":

@@ -69,7 +69,7 @@ function [preamble_clean_up, preamble_equalized_up] = process_frame(pkt)
     pkt = pkt(strt_indx:strt_indx+800);
     
     % Somewhat redundantly, extract preamble from the raw IQ samples
-    preamble_clean = extract_preamble(pkt, 0.8, nht);
+    preamble_clean = extract_preamble(pkt, nht);
 
     % Perform CFO removal & equalization
     preamble_equalized = equalize(pkt, nht);
@@ -91,7 +91,6 @@ function [pkt_stf_ltf_fo] = equalize(pkt, nht)
     pkt_ltf = pkt(ltf_ind(1):ltf_ind(2));
 
     freqOffsetEst2 = wlanFineCFOEstimate(pkt_ltf,'CBW20');
-
     pkt = pkt.*exp(1j*(1:length(pkt))'/20e6*2*pi*-freqOffsetEst2);
 
     % Specify indexes of null & pilot subcarriers
@@ -129,33 +128,11 @@ end
 % This method somewhat does refundant work. We could simply use indexes
 % from stf_ind & ltf_ind to get our preamble. But as a sanity check, we're
 % going to do it from scratch using cross-correlation.
-function [preamble] = extract_preamble(X, sensitivity, nht)
+function [preamble] = extract_preamble(X, nht)
     % Determine indexes of STF and LTF sequences
     stf_ind = wlanFieldIndices(nht,'L-STF');
     ltf_ind = wlanFieldIndices(nht,'L-LTF');
     pkt_stf = X(stf_ind(1):stf_ind(2));
     pkt_ltf = X(ltf_ind(1):ltf_ind(2));
     preamble = [pkt_stf; pkt_ltf];
-
-%     % Generate the reference LTF sequence
-%     % The function wlanLLTF generates the L-LTF time domain signal for 802.11n
-%     ltfSequence = wlanLLTF(nht);
-%     stfSequence = wlanLSTF(nht);
-%     
-%     % Perform correlation
-%     [correlationLTF, lagLTF] = xcorr(X, ltfSequence);
-%     [correlationSTF, lagSTF] = xcorr(X, stfSequence);
-%     
-%     correlationLTF = abs(correlationLTF);
-%     correlationSTF = abs(correlationSTF);
-%     
-%     % Find peaks in the correlation
-%     [~, locsLTF] = findpeaks(correlationLTF, 'MinPeakHeight', max(correlationLTF) * sensitivity, 'MinPeakDistance', length(ltfSequence));
-%     [~, locsSTF] = findpeaks(correlationSTF, 'MinPeakHeight', max(correlationSTF) * sensitivity, 'MinPeakDistance', length(stfSequence));
-%     
-%     tLTF = lagLTF(locsLTF);
-%     tSTF = lagSTF(locsSTF);
-% 
-%     % STF (16 * 10) + LTF (32 + 64 + 64) = 320 IQ samples
-%     preamble = X(tSTF : tSTF + 320 - 1);
 end

@@ -7,10 +7,10 @@ from collections import deque
 JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
 # JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
 
-TX_INTERVAL = "0.5" # Interval (in seconds) between injected probe requests
+TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
 TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
-TX_CHANNEL = 5 # Channel ID on which we'll be sending our probes [1 -- 13]
+TX_CHANNEL = 8 # Channel ID on which we'll be sending our probes [1 -- 13]
 TX_INTERFACE = "wlp6s8mon" # Default name of the interface we'll set in monitor mode
 
 TX_NODES_TRAIN = ["node7-10", "node7-11", "node7-14", "node1-10", "node1-12", "node8-3", "node1-16", "node1-18",

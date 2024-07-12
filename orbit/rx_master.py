@@ -1,6 +1,7 @@
 import os
 import time
 
+#                    1         2         3         4         5         6         7         8         9         10        11        12        13
 OFDM_CENTER_FREQ = ["2412e6", "2417e6", "2422e6", "2427e6", "2432e6", "2437e6", "2442e6", "2447e6", "2452e6", "2457e6", "2462e6", "2467e6", "2472e6"]
 
 JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # node via which we're connecting to the Grid
@@ -10,14 +11,14 @@ CORE_LOCAL_FOLDER = "/Users/stepanmazokha/Desktop/"
 CORE_RX_FILE = "/root/samples.dat"
 RX_NODES = ["node1-1"]
 
-RX_CHANNEL_IDX = 5 # 1-based value, according to 802.11 standard
+RX_CHANNEL_IDX = 11 # 1-based value, according to 802.11 standard
 RX_USRP_IP = "addr=192.168.10.2"
 RX_FREQ = OFDM_CENTER_FREQ[RX_CHANNEL_IDX - 1]
-RX_GAIN = "0.5" # Chx Gain Value, Absolute (dB), range (for SBX): 0 - 31.5 dB
+RX_GAIN = "10" # Chx Gain Value, Absolute (dB), range (for SBX): 0 - 31.5 dB
 RX_SAMP_RATE = "25e6" # Sampling rate, should be at least 20 Msps
-RX_SKIP = "2" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RATE
+RX_SKIP = "1" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RATE
 # RX_CAP_LEN = "0.512"
-RX_CAP_LEN = "1" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE
+RX_CAP_LEN = "2" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE
 # RX_LO_OFF = "10e6"
 RX_LO_OFF = "0" # If the center freq is crowded, we can optionally tune it up (WiSig had it at 10 MHz)
 

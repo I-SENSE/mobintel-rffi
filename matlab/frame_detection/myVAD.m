@@ -1,4 +1,4 @@
-function [x_start, x_finish] = myVAD(x, Ts, Tsh)
+function [x_start, x_finish] = myVAD(x)
 
 %Author:        Olutope Foluso Omogbenigun
 %Email:         olutopeomogbenigun at hotmail.com
@@ -12,8 +12,8 @@ function [x_start, x_finish] = myVAD(x, Ts, Tsh)
 
 
 Ini = 0.000002;          %Initial silence duration in seconds
-%Ts = 0.000001;          %Frame width in seconds
-%Tsh = 0.000001;        %Frame shift in seconds
+Ts = 0.000001;          %Frame width in seconds
+Tsh = 0.000001;        %Frame shift in seconds
 Fs = 25000000;         %Sampling Frequency
 counter1 = 0;   
 counter2 = 0;
@@ -158,7 +158,6 @@ trimmedX = x(x_start:x_finish); %Trim speech sample by start and finish
 % Ts = 0.0000001;          %Frame width in seconds
 % Tsh = 0.0000001;        %Frame shift in seconds
 % Fs = 25000000;         %Sampling Frequency
-
 
 
 

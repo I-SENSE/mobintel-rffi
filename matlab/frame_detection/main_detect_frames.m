@@ -13,140 +13,201 @@ function [] = main_detect_frames(node_name, input_dir, output_dir)
     fileList = dir([input_dir, '/*.dat']);
 
     for fi = 1:length(fileList)
-        transmitter=regexp(fileList(fi).name, ['\d+-\d+(?=:*}_rx{node:' , node_name, '-rxFreq:2462e6-rxGain:0\.5-capLen:0\.512-rxSampRate:25e6}\.dat)'], 'match');
+        transmitter = node_name(5:end);
     
-        transmitter=transmitter{1};
-    
-        fprintf('Processing %d of %d: node%s\n',fi,length(fileList),transmitter);
-    
-        packet_log = {};
-        packet_log_filename = strcat('packets_', transmitter, '.mat');
+        fprintf('Processing %d of %d: node%s\n', fi, length(fileList), transmitter);
     
         x = read_complex_binary([input_dir, fileList(fi).name]);
 
-        % Optionally, demonstrate STF / LTF sequence starts
-        % show_stf_ltf(x, 800000, 0.8)
+        % TODO: remove (this makes debugging a little faster)
+        x = x(1:floor(length(x) / 5));
 
-        en=find_beg(x,1);
-    
-        final = length(x)-find_beg(flip(x),1);
-    
-        x_r = real(x);  
-        xx=x_r;
-    
-        energies=[];
-        maxs=[];
-        endpoints=[];
-        lengths=[];
-    
-        filter = zeros(length(x), 1);
+        % Identify all frames in the signal, as well as accompanied attributes
+        energies=[]; % average energy for each frame
+        maxs=[]; % absolute max value of real (or imag) samples for each frame
+        endpoints=[]; % frame start & end indexes
+        lengths=[]; % how many samples each frame takes
 
-        tt=0;
-
-        while en<final
-            tt = tt +1;
-            [st,en]=split(x,en);
-            if en>=final || en==-1 || st==-1
+        % Find the first significant event in the signal
+        en = find_beginning(x, 1);
+        frame_count = 0;
+        while en < length(x)
+            % Identify next frame (using a threshold, set inside the fun)
+            % Note: modify internal threshold if it doesn't work
+            [st, en] = split(x, en);
+            if en >= length(x) || en == -1 || st == -1
                 break;
             end
-            y=x_r(st:en);
 
-            [s,f]=myVAD(y, 0.0000001, 0.0000001);
-    
-            lengths(end+1)=f-s+1;
-            [energies(end+1), maxs(end+1)] = signal_energy(y(s:f));
-    
-            s=s+st;
-            f=f+st;
+            % Extract frame amplitudes of the identified frame
+            y = real(x(st:en));
 
-            endpoints(end+1) = complex(s,f);
-        end
-
-        if ~exist([output_dir, 'statistics/'], 'dir')
-           mkdir([output_dir, 'statistics/']);
-        end
-        save([output_dir, 'statistics/', transmitter], 'endpoints','lengths','energies','maxs');
-
-        sd=std(lengths);
-        zs=(lengths-mean(lengths))./sd;
+            % Use VAD to trim out unnecessary sections of the frame
+            [s, f] = myVAD(y);
     
-        num=1;
-    
-        for pi=1:length(energies)
+            % Calculate length of the frame
+            lengths(end + 1) = f - s + 1;
             
-            endpoint=endpoints(pi);
-            s=real(endpoint);
-            f=imag(endpoint);
-            xx(s:f)=0;
-            if pi < length(energies) && abs(zs(pi)) < 5 && maxs(pi) < 0.5 && energies(pi) < 0.25 && energies(pi) > 0.001 && pair_length(endpoints(pi)) >= 1000  && pair_length(endpoints(pi+1)) <= 2000 % && energies(i+1) > 0.4
-                xx(s:f)=0;
-                filter(s:f)=1;
+            % Calculate average energy & absolute max value of the frame
+            [energies(end + 1), maxs(end + 1)] = signal_energy(y(s:f));
+
+            % Calculate start & end indexes of the resulting frame
+            endpoints(end + 1) = complex(s + st, f + st);
+
+            frame_count = frame_count + 1;
+        end
+
+        % Normalize frame lengths
+        lengths = abs((lengths-mean(lengths))./std(lengths));
     
+        figure;
+        hold on;
+        plot(1:length(x), real(x), 'black');
+
+        % Analyze & filter out all identified frames
+        packet_log = {};
+        for frame_idx = 1:frame_count
+            % Extract frame coordinates
+            s = real(endpoints(frame_idx));
+            f = imag(endpoints(frame_idx));
+
+            disp('Max:    ' + string(maxs(frame_idx)));
+            disp('Energy: ' + string(energies(frame_idx)));
+            disp('Length: ' + string(lengths(frame_idx)))
+            disp('Pair l: ' + string(pair_length(endpoints(frame_idx))));
+            disp('Pair r: ' + string(pair_length(endpoints(frame_idx))));
+            disp('-----------------------');
+
+            max = maxs(frame_idx);
+            energy = energies(frame_idx);
+            len = lengths(frame_idx);
+            pair = pair_length(endpoints(frame_idx));
+
+            % Note: modify these thresholds if the filtering doesn't work
+            check_maxs = max <= 0.02;
+            check_energies = 0.002 <= energy;
+            check_lenghts = 0.01 <= len && len <= 5;
+            check_pair = 2000 <= pair;
+
+            if check_lenghts && check_maxs && check_energies && check_pair
                 packet_log{end+1}=x(s:f);
-                num=num+1;
-    
-            end
-    
-            if pi == length(energies) && abs(zs(pi)) < 5 && maxs(pi) < 0.5 && energies(pi) < 0.25 && energies(pi) > 0.001 && (f-s >= 1000)
-                xx(s:f)=0;
-                filter(s:f)=1;
-    
-                packet_log{end+1}=x(s:f);       
-                num=num+1;
-    
+                plot(s:f, real(x(s:f)), 'green');
+            else
+                plot(s:f, real(x(s:f)), 'blue');
             end
         end
+
+        hold off;
        
         if ~exist([output_dir, 'packets/'], 'dir')
             mkdir([output_dir, 'packets/']);
         end
-        save([output_dir, 'packets/', packet_log_filename], 'packet_log');
+        save([output_dir, 'packets/', 'packets_', transmitter, '.mat'], 'packet_log');
     end
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% This function can be used to show the starting indexes for the STF and
-% LTF sequences in the raw signal.
-%
-% Suggested values:
-% x_len: 800000
-% sensitivity: 0.8 (the lower the bar - the more you'll find)
-function [] = show_stf_ltf(X, x_len, sensitivity)
-    X = X(1:x_len);
+% Calculates difference between imaginary and real parts of a value
+function p = pair_length(value)
+    p = imag(value) - real(value);
+end
+
+% Locates beginning of a significant event in IQ signal, beginning with a
+% start index. 
+function [e] = find_beginning(signal, start)
+    x = signal(start:end);
     
-    % Create a configuration object for an 802.11n packet
-    cfgHT = wlanNonHTConfig;
+    threshold = 0.005;
+    n = 100;
     
-    % Generate the reference LTF sequence
-    % The function wlanLLTF generates the L-LTF time domain signal for 802.11n
-    ltfSequence = wlanLLTF(cfgHT);
-    stfSequence = wlanLSTF(cfgHT);
+    i = start;
+    j = i + n;
+    while i <= length(x)
+        count = 0;
+        while i <= j && i <= length(x)
+            if real(x(i)) < threshold && imag(x(i)) < threshold
+                count = count + 1;
+            end
+            i = i + 1;
+        end
+        if n <= count
+            e = max((j + j - n)/2, 0);
+            break;
+        end
+        j=j+n;
+    end
     
-    % Perform correlation
-    [correlationLTF, lagLTF] = xcorr(X, ltfSequence);
-    [correlationSTF, lagSTF] = xcorr(X, stfSequence);
+    e = e + start;
+end
+
+% Estimates energy of a given series of IQ samples
+% - s: average energy of the given signal
+% - m: maximum absolute value of real (or imag) parts of the signal
+function [s, m] = signal_energy(signal)
+    s = 0;
+    m = -1;
     
-    correlationLTF = abs(correlationLTF);
-    correlationSTF = abs(correlationSTF);
+    for i = 1:length(signal)
+       m = max(m, abs(real(signal(i))));
+       m = max(m, abs(imag(signal(i))));
+       s = s + abs(signal(i));
+    end
     
-    % Find peaks in the correlation
-    [~, locsLTF] = findpeaks(correlationLTF, 'MinPeakHeight', max(correlationLTF) * sensitivity, 'MinPeakDistance', length(ltfSequence));
-    [~, locsSTF] = findpeaks(correlationSTF, 'MinPeakHeight', max(correlationSTF) * sensitivity, 'MinPeakDistance', length(stfSequence));
+    s = s / length(signal);
+end
+
+% This function aims to identify two points in a given signal:
+% - s: position where the signal first exceeds a threshold
+% - e: ending point where signal drops below the threshold for a certain
+% number of consecutive samples
+function [s, e] = split(signal, start)
+    x = signal;
     
-    startIndicesLTF = lagLTF(locsLTF);
-    startIndicesSTF = lagSTF(locsSTF);
+    threshold = 0.001; % threshold for real & imaginary parts
+    n = 100; % segment length
     
-    % Optional: Plot the IQ samples and mark the LTF start points
-    figure;
-    plot(1:length(X), real(X));
-    hold on;
-    plot(startIndicesLTF, zeros(size(startIndicesLTF, 1)), 'r.');
-    plot(startIndicesSTF, zeros(size(startIndicesSTF, 1)), 'g.');
-    title('IQ Samples with LTF Start Points');
-    xlabel('Sample Index');
-    ylabel('Amplitude');
-    grid on;
-    hold off;
-    disp('');
+    i = start + 1;
+    j = i + n;
+
+    % Find the first segment where the signal exceeds the threshold
+    s = -1; % initialize start index
+    while i <= length(x)
+        yn = 0; % flag to indicate threshold crossing
+        while i <= j && i <= length(x)
+            if real(x(i)) > threshold || imag(x(i)) > threshold
+                s = (i + i - n) / 2;
+                yn = 1;
+                break;
+            end
+            i = i + 1;
+        end
+
+        % Did we cross the threshold? Let's stop searching
+        if yn == 1
+            break;
+        end
+        j = j + n;
+    end 
+    
+    j = i + n; % Reset j for the second loop
+    
+    e = -1; % Initialize the end index
+    
+    % Finds the first segment after the start index where the signal falls 
+    % below the threshold for n consecutive samples
+    while i <= length(x)
+        count = 0; % counter for samples below threshold
+        while i<=j && i<=length(x)
+            if real(x(i)) < threshold && imag(x(i)) < threshold
+                count = count + 1;
+            end
+            i=i+1;
+        end
+        if count >= n
+            e = (j + j - n) / 2; % set end index
+            break;
+        end
+        j = j + n;
+    end
 end

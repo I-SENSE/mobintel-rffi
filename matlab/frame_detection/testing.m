@@ -1,6 +1,6 @@
 close all; clear; clc;
 
-DIR_IN = '/Users/stepanmazokha/Desktop/debug/';
+DIR_IN = '/Users/stepanmazokha/Desktop/our_raw_rffi_dataset/';
 DIR_OUT = '/Users/stepanmazokha/Desktop/orbit_frames_rffi_dataset/epoch_2024-07-11_14-12-23/';
 
 file1_in = get_file_path(DIR_IN, 'silent', 'samples');
@@ -16,11 +16,13 @@ file_out = DIR_OUT;
 % main_detect_frames('node1-1', [DIR_IN 'epoch_2024-07-11_14-14-01/'], file_out);
 
 % Out Data: With Signal
-% main_detect_frames('node1-1', [DIR_IN 'epoch_2024-07-11_14-12-23/'], file_out);
+main_detect_frames('node1-1', [DIR_IN 'epoch_2024-07-11_14-12-23/'], file_out);
 
-plot_iq(file1_in);
-plot_iq(file2_in);
-plot_iq(file3_in);
+% main_detect_frames('node1-1', [DIR_IN 'epoch_3/'], file_out);
+
+% plot_iq(file1_in);
+% plot_iq(file2_in);
+% plot_iq(file3_in);
 
 function[] = plot_iq(fullpath)
     x = read_complex_binary(fullpath);

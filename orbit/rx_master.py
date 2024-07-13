@@ -73,6 +73,11 @@ def node_configure(node_id):
 
     send_command(True, node_id, "cd /root/ && git clone https://github.com/i-sense/mobintel-rffi && mv /root/mobintel-rffi/orbit/gnuradio-n210 /root/ && rm -rf /root/mobintel-rffi")
 
+    # These commands take a long time to run, but are paramount for reducing background noise, etc
+    send_command(True, node_id, 'uhd_cal_rx_iq_balance --verbose --args="addr=192.168.10.2"')
+    send_command(True, node_id, 'uhd_cal_tx_iq_balance --verbose --args="addr=192.168.10.2"')
+    send_command(True, node_id, 'uhd_cal_tx_dc_offset --verbose --args="addr=192.168.10.2"')
+
     print('Configure done')
 
 def node_capture(tx_node_id, rx_node_id, local_dir):
@@ -155,7 +160,7 @@ def main():
 
     print("OK, we'll work here: " + rootFolder)
 
-    tx_node_id = input("Which node are we emitting from? [nodeX-Y]")
+    # tx_node_id = input("Which node are we emitting from? [nodeX-Y]")
 
     while True:
         instruction = input("What should we do? [config | config one | rx | rx one]")
@@ -172,11 +177,10 @@ def main():
                 tx_node_id = temp
             mode_rx(RX_NODES, rootFolder, tx_node_id)
         elif instruction == 'rx one':
-            temp = input(f"Which node are we emitting from? [nodeX-Y | enter to use {tx_node_id}]")
-            if len(temp) > 0:
-                print(f"OK, TX = {tx_node_id}")
-                tx_node_id = temp
-            rx_node_id = input("Which node should we capture from? [nodeX-Y]")
+            # temp = input(f"Which node are we emitting from? [nodeX-Y | enter to use {tx_node_id}]")
+            tx_node_id = input("TX node ID: ")
+            # rx_node_id = input("RX node ID: ")
+            rx_node_id = "node1-1"
             mode_rx([rx_node_id], rootFolder, tx_node_id)
         else: print("Wrong command.")
 

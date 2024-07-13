@@ -143,20 +143,19 @@ def node_configure_tx(node_id):
     
 def node_transmit(tx_node_id, ap_node_id):
     send_command('grid', tx_node_id, "rfkill unblock wlan")
+    time.sleep(2)
 
     while True:
         # input("Hit when you're ready to check for WiFi availability...")
         send_command('grid', tx_node_id, 'nmcli dev wifi | grep "mobloc_wlan"')
-        answer = input("Do you see WiFi network 'mobloc_wlan'? [Y/n]")
-        if answer == 'Y':
+        answer = input("Do you see WiFi network 'mobloc_wlan'? [hit/n]")
+        if answer is not 'n':
             break
 
     send_command('grid', tx_node_id, "nmcli connection up mobloc")
     send_command('grid', tx_node_id, "ping 192.168.16.1 -c 2")
 
     input("Ready to start transmission?")
-
-    send_command('outdoor', ap_node_id, "rm -rf /root/temp_node.dat")
     
     # command_tx_start = "tmux new-session -d -s emit 'cat /dev/urandom | netcat -u 192.168.16.1 55555'"
     # command_ap_start = "tmux new-session -d -s receive 'netcat -lu  192.168.16.1 55555 > \"/root/temp_node.dat\"'"
@@ -167,8 +166,9 @@ def node_transmit(tx_node_id, ap_node_id):
     command_tx_stop = "tmux kill-session -t emit"
     command_ap_stop = "tmux kill-session -t receive"
 
-    send_command('outdoor', ap_node_id, command_ap_stop)
-    send_command('grid', tx_node_id, command_tx_stop)
+    # send_command('outdoor', ap_node_id, "rm -rf /root/temp_node.dat")
+    # send_command('outdoor', ap_node_id, command_ap_stop)
+    # send_command('grid', tx_node_id, command_tx_stop)
 
     send_command('outdoor', ap_node_id, command_ap_start)
     time.sleep(2) # let AP set up the receival

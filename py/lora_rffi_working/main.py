@@ -13,7 +13,7 @@ from deep_learning_models import TripletNet, identity_loss
 def train_feature_extractor(
         file_path = './dataset/Train/dataset_training_aug.h5', 
         dev_range = np.arange(0,30, dtype = int), 
-        pkt_range = np.arange(0,500, dtype = int), # TODO: was 1000
+        pkt_range = np.arange(0,400, dtype = int), # TODO: was 1000
         snr_range = np.arange(20,80)
                             ):
     '''
@@ -121,10 +121,10 @@ def test_classification(
         file_path_enrol,
         file_path_clf,
         feature_extractor_name,
-        dev_range_enrol = np.arange(0,15, dtype = int),
+        dev_range_enrol = np.arange(0,10, dtype = int),
         pkt_range_enrol = np.arange(0,100, dtype = int),
-        dev_range_clf = np.arange(0,15, dtype = int),
-        pkt_range_clf = np.arange(400,500, dtype = int)
+        dev_range_clf = np.arange(0,10, dtype = int),
+        pkt_range_clf = np.arange(300,400, dtype = int)
                         ):
     '''
     test_classification performs a classification task and returns the 
@@ -180,7 +180,7 @@ def test_classification(
     del data_enrol
     
     # Create a K-NN classifier using the RFFs extracted from the enrollment dataset.
-    knnclf=KNeighborsClassifier(n_neighbors=15,metric='euclidean')
+    knnclf=KNeighborsClassifier(n_neighbors=10,metric='euclidean')
     knnclf.fit(feature_enrol, np.ravel(label_enrol))
     
     
@@ -210,25 +210,35 @@ if __name__ == '__main__':
     # run_for = 'Train'
     run_for = 'Classification'
 
-    root_path = '/home/smazokha2016/Desktop'
-    dataset_train = '/wisig_dataset-2021_03_01'
-    dataset_enrol = '/wisig_dataset-2021_03_08'
-    dataset_identify = '/wisig_dataset-2021_03_08'
+    root_path = '/home/smazokha2016/Desktop/orbit_pickles_rffi_dataset'
+    dataset_train = '/training_2024-07-13_06-53-20'
+    # dataset_enrol = '/epoch_2024-07-13_07-40-21'
+    dataset_enrol = '/epoch_2024-07-13_08-14-13'
+    # dataset_identify = '/epoch_2024-07-13_07-40-21'
+    # dataset_identify = '/epoch_2024-07-13_07-52-31'
+    # dataset_identify = '/epoch_2024-07-13_08-03-18'
+    # dataset_identify = '/epoch_2024-07-13_08-14-13'
+    # dataset_identify = '/epoch_2024-07-13_08-27-13'
+    # dataset_identify = '/epoch_2024-07-13_08-38-59'
+    # dataset_identify = '/epoch_2024-07-13_08-51-04'
+    dataset_identify = '/epoch_2024-07-13_09-02-07'
+    # dataset_identify = '/epoch_2024-07-13_09-17-04'
+    # dataset_identify = '/epoch_2024-07-13_09-31-48'
     
     if run_for == 'Train':
-        feature_extractor = train_feature_extractor(root_path + dataset_train + '/Train/node1-1_non_eq_train.h5')
-        feature_extractor.save(root_path + '/my_models/Extractor_Wisig_day1.h5')
+        feature_extractor = train_feature_extractor(root_path + dataset_train + '/node1-1_non_eq_train.h5')
+        feature_extractor.save(root_path + '/my_models/Extractor_Orbit_day1.h5')
     elif run_for == 'Classification':
         # Specify the device index range for classification.
-        test_dev_range = np.arange(0,15, dtype = int)
+        test_dev_range = np.arange(0,10, dtype = int)
         
         # Perform the classification task.
         pred_label, true_label, acc = test_classification(file_path_enrol = 
-                                                          root_path + dataset_enrol + '/Test/node1-1_non_eq_test.h5',
+                                                          root_path + dataset_enrol + '/node1-1_non_eq_test.h5',
                                                           file_path_clf = 
-                                                          root_path + dataset_identify + '/Test/node1-1_non_eq_test.h5',
+                                                          root_path + dataset_identify + '/node1-1_non_eq_test.h5',
                                                           feature_extractor_name = 
-                                                          root_path + '/my_models/Extractor_Wisig_day1.h5')
+                                                          root_path + '/my_models/Extractor_Orbit_day1.h5')
         
         # Plot the confusion matrix.
         conf_mat = confusion_matrix(true_label, pred_label, normalize='true')

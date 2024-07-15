@@ -1,30 +1,29 @@
 close all; clear; clc;
 
 DIR_IN = '/Users/stepanmazokha/Desktop/our_raw_rffi_dataset/';
-DIR_OUT = '/Users/stepanmazokha/Desktop/orbit_frames_rffi_dataset/epoch_2024-07-11_14-12-23/';
+DIR_OUT = '/Users/stepanmazokha/Desktop/orbit_frames_rffi_dataset/';
 
-file1_in = get_file_path(DIR_IN, 'test1', 'samples');
-file2_in = get_file_path(DIR_IN, 'test2', 'samples');
-file3_in = get_file_path(DIR_IN, 'test3', 'samples');
-file4_in = get_file_path(DIR_IN, 'test4', 'samples');
+filename_silent = '/Users/stepanmazokha/Desktop/our_raw_rffi_dataset/training_tx{node_empty_channel}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}.dat';
 
-file_out = DIR_OUT;
+dir_list = dir(DIR_IN);
+for idx = 3:length(dir_list)
+    if dir_list(idx).isdir
+        dir_name = dir_list(idx).name;
+        full_dir_in = [DIR_IN, dir_name, '/'];
+        full_dir_out = [DIR_OUT, dir_name, '/'];
+        disp(dir_name);
 
-% WiSig Data
-% main_detect_frames('node1-1', [DIR_IN 'node1-1_wifi_2021_03_01/'], file_out); 
+        main_detect_frames('node1-1', filename_silent, full_dir_in, full_dir_out);
+    end
+end
 
-% Our Data: Silent
-% main_detect_frames('node1-1', [DIR_IN 'epoch_2024-07-11_14-14-01/'], file_out);
+% main_detect_frames('node1-1', filename_silent, [DIR_IN 'training_2024-07-13_06-53-20/'], [DIR_OUT 'training_2024-07-13_06-53-20/'])
+% main_detect_frames('node1-1', filename_silent, [DIR_IN 'epoch_2024-07-13_07-40-21/'], [DIR_OUT 'epoch_2024-07-13_07-40-21/'])
 
-% Out Data: With Signal
-% main_detect_frames('node1-1', [DIR_IN 'epoch_2024-07-11_14-12-23/'], file_out);
-
-% main_detect_frames('node1-1', [DIR_IN 'epoch_3/'], file_out);
-
-plot_iq(file1_in);
-plot_iq(file2_in);
-plot_iq(file3_in);
-plot_iq(file4_in);
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-13_08-38-59', 'tx{node_node20-15}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-13_08-51-04', 'tx{node_node20-19}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-13_09-02-07', 'tx{node_node16-16}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-13_09-31-48', 'tx{node_node12-20}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
 
 function[] = plot_iq(fullpath)
     x = read_complex_binary(fullpath);

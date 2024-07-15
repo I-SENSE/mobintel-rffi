@@ -9,104 +9,218 @@
 % tx{node/node14-9}_rx{node/node1-1-rxFreq/2462e6-rxGain/0.5-capLen/0.512-rxSampRate/25e6}
 %
 % Output directory must exist and should be empty.
-function [] = main_detect_frames(node_name, input_dir, output_dir)
-    fileList = dir([input_dir, '/*.dat']);
+function [] = main_detect_frames(rx_node_id, filepath_silent, dir_signal, dir_output)
+    X_silent = read_complex_binary(filepath_silent);
 
-    for fi = 1:length(fileList)
-        transmitter = node_name(5:end);
-    
-        fprintf('Processing %d of %d: node%s\n', fi, length(fileList), transmitter);
-    
-        x = read_complex_binary([input_dir, fileList(fi).name]);
+    % Identify all .dat files & process each one of them
+    file_list = dir([dir_signal, '/*.dat']);
+    for fi = 1:length(file_list)
+        filename = file_list(fi).name;
+        pattern = 'tx\{node_(.*?)\}_rx';
+        matches = regexp(filename, pattern, 'tokens');
 
-        % TODO: remove (this makes debugging a little faster)
-        x = x(1:floor(length(x) / 5));
-
-        % Identify all frames in the signal, as well as accompanied attributes
-        energies=[]; % average energy for each frame
-        maxs=[]; % absolute max value of real (or imag) samples for each frame
-        endpoints=[]; % frame start & end indexes
-        lengths=[]; % how many samples each frame takes
-
-        % Find the first significant event in the signal
-        en = find_beginning(x, 1);
-        frame_count = 0;
-        while en < length(x)
-            % Identify next frame (using a threshold, set inside the fun)
-            % Note: modify internal threshold if it doesn't work
-            [st, en] = split(x, en);
-            if en >= length(x) || en == -1 || st == -1
-                break;
-            end
-
-            % Extract frame amplitudes of the identified frame
-            y = real(x(st:en));
-
-            % Use VAD to trim out unnecessary sections of the frame
-            [s, f] = myVAD(y);
-    
-            % Calculate length of the frame
-            lengths(end + 1) = f - s + 1;
-            
-            % Calculate average energy & absolute max value of the frame
-            [energies(end + 1), maxs(end + 1)] = signal_energy(y(s:f));
-
-            % Calculate start & end indexes of the resulting frame
-            endpoints(end + 1) = complex(s + st, f + st);
-
-            frame_count = frame_count + 1;
+        if ~isempty(matches)
+            transmitter = matches{1}{1};
+        else
+            transmitter = rx_node_id(10:end);
         end
+        
+        fprintf('Processing %d of %d: %s\n', fi, length(file_list), transmitter);
 
-        % Normalize frame lengths
-        lengths = abs((lengths-mean(lengths))./std(lengths));
-    
-        figure;
-        hold on;
-        plot(1:length(x), real(x), 'black');
+        X_signal = read_complex_binary([dir_signal, filename]);
 
-        % Analyze & filter out all identified frames
-        packet_log = {};
-        for frame_idx = 1:frame_count
-            % Extract frame coordinates
-            s = real(endpoints(frame_idx));
-            f = imag(endpoints(frame_idx));
+        packet_log = process_file(X_silent, X_signal, num2str(fi));
 
-            disp('Max:    ' + string(maxs(frame_idx)));
-            disp('Energy: ' + string(energies(frame_idx)));
-            disp('Length: ' + string(lengths(frame_idx)))
-            disp('Pair l: ' + string(pair_length(endpoints(frame_idx))));
-            disp('Pair r: ' + string(pair_length(endpoints(frame_idx))));
-            disp('-----------------------');
-
-            max = maxs(frame_idx);
-            energy = energies(frame_idx);
-            len = lengths(frame_idx);
-            pair = pair_length(endpoints(frame_idx));
-
-            % Note: modify these thresholds if the filtering doesn't work
-            check_maxs = max <= 0.02;
-            check_energies = 0.002 <= energy;
-            check_lenghts = 0.01 <= len && len <= 5;
-            check_pair = 2000 <= pair;
-
-            if check_lenghts && check_maxs && check_energies && check_pair
-                packet_log{end+1}=x(s:f);
-                plot(s:f, real(x(s:f)), 'green');
-            else
-                plot(s:f, real(x(s:f)), 'blue');
-            end
+        if ~exist([dir_output, 'packets/'], 'dir')
+            mkdir([dir_output, 'packets/']);
         end
-
-        hold off;
-       
-        if ~exist([output_dir, 'packets/'], 'dir')
-            mkdir([output_dir, 'packets/']);
-        end
-        save([output_dir, 'packets/', 'packets_', transmitter, '.mat'], 'packet_log');
+        save([dir_output, 'packets/', 'packets_', transmitter, '.mat'], 'packet_log');
     end
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [frame_log] = process_file(X_silent, X_signal, transmitter)
+    rng(123);
+
+    % Find frames in both silent & signal samples
+    [endpoints_silent, features_silent] = find_frames(X_silent);
+    [endpoints_signal, features_signal] = find_frames(X_signal);
+
+    % Cluster frames in silent samples, identify frames we need to drop (i.e., alien frames)
+    silent_cluster_count = 5;
+    [labels_silent, centroids_silent] = kmeans(features_silent, silent_cluster_count, 'Replicates', 5);
+%     plot_labeled_frames(real(X_silent), endpoints_silent, labels_silent, lines(silent_cluster_count), "Silent IQ Clusters");
+
+    thresholds = [1000, 0.1, 0.5, 1000, 1000];
+%     allowed_centroids = [2, 3];
+    allowed_centroids = [3];
+    alien_label = 2;
+
+    is_frame_alien = find_alien_frames(features_signal, centroids_silent, thresholds, allowed_centroids, alien_label);
+%     plot_labeled_frames(real(X_signal), endpoints_signal, is_frame_alien, lines(2), label);
+    
+    % Update the lists of signal endpoints & features, drop alien frames
+    endpoints_signal = endpoints_signal(:, is_frame_alien == 1);
+    features_signal = features_signal(is_frame_alien == 1, :);
+%     plot_labeled_frames(real(X_signal), endpoints_signal, ones(size(endpoints_signal, 2), 1), lines(1), label);
+
+    % Run k-means on the remaining frames and see which ones we can keep
+    rng(123);
+    remaining_k = 10;
+    remaining_colors = lines(remaining_k);
+    [labels_filtered, ~] = kmeans(features_signal, remaining_k, 'Replicates', 5);
+
+    % Count the number of frames in each cluster
+    cluster_counts = histcounts(labels_filtered, remaining_k);
+    [sorted_counts, sorted_indices] = sort(cluster_counts, 'descend');
+
+    sorted_counts = sorted_counts(1:6);
+    sorted_indices = sorted_indices(1:6);
+
+%     plot_labeled_frames(real(X_signal), endpoints_signal, labels_filtered, remaining_colors, label);
+
+%     screenSize = get(0, 'ScreenSize');
+%     width = screenSize(3);  % Full width of the screen
+%     height = screenSize(4) / 4;  % 1/4th height of the screen
+%     figure('Position', [1, 1, width, height]);
+%     
+%     hold on;
+%     plot(1:length(X_signal), real(X_signal), 'black');
+%     h = gobjects(remaining_k, 1);
+%     for i = 1:length(endpoints_signal)
+%         s = real(endpoints_signal(i));
+%         f = imag(endpoints_signal(i));
+% 
+%         label = labels_filtered(i);
+% 
+%         if ismember(label, sorted_indices)
+%     %         plot(s:f, real(X(s:f)), 'Color', colors(label, :));
+%             h(label) = plot(s:f, real(X_signal(s:f)), 'Color', remaining_colors(label, :), 'LineWidth', 2);
+%         end
+%     end
+%     hold off;
+%     title(label);
+
+%     legend(h, [arrayfun(@(x) ['Cluster ' num2str(sorted_indices(x)) ' -- ' num2str(sorted_counts(x))], 1:remaining_k, 'UniformOutput', false), 'Silent Mode'], 'LineWidth', 2);
+    
+    frame_log = {};
+
+%     screenSize = get(0, 'ScreenSize');
+%     width = screenSize(3);  % Full width of the screen
+%     height = screenSize(4) / 4;  % 1/4th height of the screen
+%     figure('Position', [1, 1, width, height]);
+%     hold on;
+%     plot(1:length(X_signal), real(X_signal), 'black');
+
+    for i = 1:length(endpoints_signal)
+        s = real(endpoints_signal(i));
+        f = imag(endpoints_signal(i));
+
+        label = labels_filtered(i);
+
+        if ismember(label, sorted_indices)
+%             plot(s:f, real(X_signal(s:f)), 'blue');
+            frame_log{end+1} = X_signal(s:f);
+        end
+    end
+%     hold off;
+%     title(label);
+
+    disp(strcat("Transmitter: ", transmitter, ". Frames: ", num2str(sum(sorted_counts))));
+%     drawnow;
+end
+
+function [] = plot_labeled_frames(X, endpoints, labels, colors, name)
+    % Display the cluster labels for each frame
+    screenSize = get(0, 'ScreenSize');
+    width = screenSize(3);  % Full width of the screen
+    height = screenSize(4) / 4;  % 1/4th height of the screen
+    figure('Position', [1, 1, width, height]);
+    
+    hold on;
+    plot(1:length(X), real(X), 'black');
+
+    for i = 1:length(endpoints)
+        s = real(endpoints(i));
+        f = imag(endpoints(i));
+
+        label = labels(i);
+
+        plot(s:f, real(X(s:f)), 'Color', colors(label, :));
+    end
+    hold off;
+    title(name);
+end
+
+function [is_frame_alien] = find_alien_frames(features_signal, centroids, thresholds, allowed_centroids, alien_label)
+    is_frame_alien = ones(size(features_signal, 1), 1);
+
+    for centroid_idx = allowed_centroids
+        centroid = centroids(centroid_idx);
+        threshold = thresholds(centroid_idx);
+
+        distances = zeros(size(features_signal, 1), 1);
+        for frame_idx = 1:size(features_signal, 1)
+            distances(frame_idx) = norm(features_signal(frame_idx, 1) - centroid);
+            if distances(frame_idx) <= threshold
+                is_frame_alien(frame_idx) = alien_label;
+            end
+        end
+    
+%         figure;
+%         scatter(1:length(distances), distances);
+%         title("Centroid distances");
+    end
+end
+
+function [endpoints, features] = find_frames(x)
+    % Identify all frames in the signal, as well as accompanied attributes
+    % - energies: average energy for each frame
+    % - maxs: absolute max value of real (or imag) samples for each frame
+    % - endpoints: % frame start & end indexes
+    % - lengths: how many samples each frame takes
+    % - pairs
+    energies = [];
+    maxs = [];
+    endpoints = [];
+    lengths = [];
+    pairs = [];
+
+    % Find the first significant event in the signal
+    en = find_beginning(x, 1);
+    while en < length(x)
+        % Identify next frame (using a threshold, set inside the fun)
+        % Note: modify internal threshold if it doesn't work
+        [st, en] = split(x, en);
+        if en >= length(x) || en == -1 || st == -1
+            break;
+        end
+
+        % Extract frame amplitudes of the identified frame
+        y = real(x(st:en));
+
+        % Use VAD to trim out unnecessary sections of the frame
+        [s, f] = myVAD(y);
+
+        % Calculate length of the frame
+        lengths(end + 1) = f - s + 1;
+        
+        % Calculate average energy & absolute max value of the frame
+        [energies(end + 1), maxs(end + 1)] = signal_energy(y(s:f));
+
+        % Calculate start & end indexes of the resulting frame
+        endpoints(end + 1) = complex(s + st, f + st);
+
+        pairs(end + 1) = pair_length(complex(s + st, f + st));
+    end
+
+    % Normalize frame lengths
+%     lengths_a = abs((lengths-mean(lengths))./std(lengths));
+
+    features = [maxs; energies; lengths; pairs]';
+%     features = [maxs; energies; lengths]';
+
+    features = normalize(features, 1, 'range', [0 1]);
+end
 
 % Calculates difference between imaginary and real parts of a value
 function p = pair_length(value)

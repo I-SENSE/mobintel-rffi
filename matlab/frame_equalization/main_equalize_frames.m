@@ -6,6 +6,10 @@ function [] = main_equalize_frames(input_dir, output_dir, min_frame_limit)
     for tx_node = 3 : length(tx_nodes)
         fl = tx_nodes(tx_node).name;
 
+        if strcmp(fl, '.DS_Store')
+            continue;
+        end
+
         load([input_dir, 'packets/', fl]);
 
         packet_log_in = packet_log;

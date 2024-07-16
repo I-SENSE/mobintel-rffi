@@ -7,12 +7,14 @@ from collections import deque
 
 JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
 
-TX_INTERVAL = "0.1" # Interval (in seconds) between injected probe requests
+TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
 TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 TX_INTERFACE = "wlp6s8" # Default name of the interface we'll set in monitor mode
 LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
+
+WIFI_DRIVER_ATHEROS_MAIN = 'ath5k' # this driver applies to all other WiFi nodes (Atheros 5212 chipset)
 
 def send_command(needsJump, node, command, capture_response=False):
     if needsJump: 
@@ -42,7 +44,7 @@ def send_command(needsJump, node, command, capture_response=False):
         return ''.join(stdout_lines)
     else: return None
 
-def node_configure(node_id):
+def node_configure(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
     send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
@@ -66,11 +68,35 @@ def node_configure(node_id):
     send_command(True, node_id, "sudo apt-get -y update")
     send_command(True, node_id, "sudo apt-get -y install network-manager net-tools hostapd wireless-tools tmux python3-pip aircrack-ng git")
     send_command(True, node_id, "pip3 install scapy")
-    send_command(True, node_id, "modprobe ath5k")
+    send_command(True, node_id, f"modprobe {driver_name}")
     send_command(True, node_id, "rfkill block wlan")
     send_command(True, node_id, "cd /root && git clone https://github.com/FanchenBao/probe_request_injection")
 
     print('Configured.')
+
+def node_emit_start(node_id, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, interval=TX_INTERVAL):
+    send_command(True, node_id, "rfkill unblock wlan")
+
+    time.sleep(2)
+
+    command_response = send_command(True, node_id, "iwconfig", capture_response=True)
+    if command_response.__contains__(TX_INTERFACE):
+        interface = TX_INTERFACE
+    else:
+        interface = llm.prompt_find_wifi_interface(command_response)
+        if interface == 'NONE':
+            interface = input("Which interface should we use?")
+        
+    send_command(True, node_id, f"airmon-ng start {interface}") # airmon ads postfix 'mon' to the newly created interface
+    send_command(True, node_id, "tmux kill-session -t emit")
+    send_command(True, node_id, f"/root/probe_request_injection/emit/emit.sh -i {interface}mon -c {channel} --mac {mac} --interval {interval} --ssid {ssid}")
+
+    return interface
+
+def node_emit_stop(node_id, interface):
+    send_command(True, node_id, f"airmon-ng stop {interface}mon")
+    send_command(True, node_id, "tmux kill-session -t emit")
+    send_command(True, node_id, "rfkill block wlan")
 
 def node_emit(node_id, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, interval=TX_INTERVAL):
     send_command(True, node_id, "rfkill unblock wlan")

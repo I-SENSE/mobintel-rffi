@@ -18,12 +18,15 @@ RX_FREQ = OFDM_CENTER_FREQ[RX_CHANNEL_IDX - 1]
 RX_GAIN = "10" # Chx Gain Value, Absolute (dB), range (for SBX): 0 - 31.5 dB
 RX_SAMP_RATE = "25e6" # Sampling rate, should be at least 20 Msps
 RX_SKIP = "1" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RATE
-RX_CAP_LEN = "2" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE
+RX_CAP_LEN = "2" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE # TODO: change to larger number for probe capture
 RX_LO_OFF = "0" # If the center freq is crowded, we can optionally tune it up (WiSig had it at 10 MHz)
 LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
 
 def generate_dir_name():
-    return time.strftime("epoch_%Y-%m-%d_%H-%M-%S", time.localtime())
+    return time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
+
+def prepare_target_dir(experiment_dir, prefix):
+    return os.path.join(experiment_dir, prefix + generate_dir_name())
 
 def send_command(needsJump, node, command, capture_response=False):
     if needsJump: 
@@ -126,19 +129,19 @@ def node_capture(tx_node_id, rx_node_id, local_dir):
     print(f'Capture completed for TX {tx_node_id}].')
 
 def mode_rx(node_ids):
-    local_folder = input("We'll store data on the desktop. What should be the folder name?")
+    experiment_dir = input("We'll store data on the desktop. What should be the folder name?")
 
-    if local_folder == "": local_folder = CORE_LOCAL_DATASET_NAME
-    local_folder = os.path.join(CORE_LOCAL_FOLDER, local_folder)
+    if experiment_dir == "": experiment_dir = CORE_LOCAL_DATASET_NAME
+    experiment_dir = os.path.join(CORE_LOCAL_FOLDER, experiment_dir)
 
-    if not os.path.exists(local_folder):
+    if not os.path.exists(experiment_dir):
         print("Root folder doesn't exist. We'll create it.")
-        os.mkdir(local_folder)
+        os.mkdir(experiment_dir)
 
-    local_folder = os.path.join(local_folder, generate_dir_name())
-    os.mkdir(local_folder)
+    target_folder = prepare_target_dir(experiment_dir, 'epoch_')
+    os.mkdir(target_folder)
 
-    print("OK, we'll work here: " + local_folder)
+    print("OK, we'll work here: " + target_folder)
 
     if len(node_ids) == 0:
         print('No nodes to emit from.')
@@ -153,7 +156,7 @@ def mode_rx(node_ids):
         instruction = input(f"Ready to RX on {rx_node_id}? [Y/skip/done]")
 
         if instruction == 'Y':
-            node_capture(tx_node_id, rx_node_id, local_folder)
+            node_capture(tx_node_id, rx_node_id, target_folder)
             node_idx = node_idx + 1
         elif instruction == 'skip':
             node_idx = node_idx + 1

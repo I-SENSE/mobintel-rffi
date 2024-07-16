@@ -9,6 +9,8 @@ JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # grid.orbit-lab.org
 JUMP_NODE_OUTDOOR = "smazokha@outdoor.orbit-lab.org" # outdoor.orbit-lab.org
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
+WIFI_DRIVER_ATHEROS_10k = 'ath10k_pci' # this driver applies only to outdoor node 2-5
+WIFI_DRIVER_ATHEROS_MAIN = 'ath5k' # this driver applies to all other WiFi nodes (Atheros 5212 chipset)
 
 def send_command(jump, node, command, capture_response=False):
     if jump == None:
@@ -43,7 +45,7 @@ def send_command(jump, node, command, capture_response=False):
         return ''.join(stdout_lines)
     else: return None
 
-def node_configure_ap(node_id, driver_name="ath5k"):
+def node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k, channel=TX_CHANNEL):
     send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a offh -t " + node_id)
     send_command(None, JUMP_NODE_OUTDOOR, "omf load -i baseline.ndz -t " + node_id)
     send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a on -t " + node_id)
@@ -78,7 +80,7 @@ interface={interface}
 driver=nl80211
 ssid=mobloc_wlan
 hw_mode=g
-channel={TX_CHANNEL}
+channel={channel}
 wmm_enabled=0
 macaddr_acl=0
 auth_algs=1
@@ -125,7 +127,7 @@ EOF'
 
     print("AP setup complete.")
 
-def node_configure_tx(node_id):
+def node_configure_tx(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k):
     send_command(None, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
     send_command(None, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(None, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
@@ -148,7 +150,7 @@ def node_configure_tx(node_id):
 
     send_command('grid', node_id, "sudo apt-get -y update")
     send_command('grid', node_id, "sudo apt-get -y install net-tools network-manager hostapd wireless-tools rfkill tmux socat")
-    send_command('grid', node_id, "modprobe ath5k")
+    send_command('grid', node_id, f"modprobe {driver_name}")
 
     interface = llm.prompt_find_wifi_interface(send_command('grid', node_id, "iwconfig", capture_response=True))
 
@@ -175,10 +177,7 @@ def node_transmission_start(tx_node_id, ap_node_id):
     #         break
 
     send_command('grid', tx_node_id, "nmcli connection up mobloc")
-    send_command('grid', tx_node_id, "ping 192.168.16.1 -c 2")
-
-    input("Ready to start transmission?")
-
+    send_command('grid', tx_node_id, "ping 192.168.16.1 -c 1")
     send_command('outdoor', ap_node_id, "tmux new-session -d -s receive 'socat - UDP-RECV:55555 > \"/root/temp_node.dat\"'")
     time.sleep(2) # let AP set up the receival
     send_command('grid', tx_node_id, "tmux new-session -d -s emit 'cat /dev/urandom | socat - UDP-SENDTO:192.168.16.1:55555'")
@@ -202,16 +201,18 @@ def main():
 
         elif tx_type == "config ap":
             # Use this code when AP is an Outdoor node
-            node_id = input("AP node ID [ath10k_pci]: ")
-            node_configure_ap(node_id, driver_name="ath10k_pci") # use when AP is in outdoor env
+            node_id = input(f"AP node ID [{WIFI_DRIVER_ATHEROS_10k}]: ")
+            node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k) # use when AP is in outdoor env
 
             # Use this code when AP is an SB3 node
-            # node_id = input("AP node ID [ath5k]: ")
+            # node_id = input(f"AP node ID [{WIFI_DRIVER_ATHEROS_MAIN}]: ")
             # node_configure_ap(node_id) # use when AP has our main Atheros driver
 
         elif tx_type == "emit one":
             tx_node_id = input("TX node ID: ")
             ap_node_id = input("AP node ID: ")
+
+            input("Ready to start transmission?")
 
             node_transmission_start(tx_node_id, ap_node_id)
             input("Transmission is in progress. Start reception. Hit to stop.")

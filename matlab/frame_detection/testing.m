@@ -22,9 +22,12 @@ close all; clear; clc;
 
 DIR_IN = '/Users/stepanmazokha/Desktop/orbit_dataset/';
 
-% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-26-39', 'tx{node_node14-7}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
-plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-30-58', 'tx{node_node14-7}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_5+rxSampRate_25e6}'));
-% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-34-07', 'tx{node_node12-20}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-34-07', 'udp-2sec'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-53-51', 'silent-5sec'));
+plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-56-20', 'probes'));
+plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-07-02', 'probes'));
+plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-11-47', 'silent'));
+plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-19-38', 'probes'));
 
 % plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-13_08-38-59', 'tx{node_node20-15}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
 % plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-13_08-51-04', 'tx{node_node20-19}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
@@ -33,6 +36,8 @@ plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-30-58', 'tx{node_node14-7}_rx
 
 function[] = plot_iq(fullpath)
     x = read_complex_binary(fullpath);
+
+    x = x(1:floor(length(x)));
     
     t = (1:floor(length(x)));
     

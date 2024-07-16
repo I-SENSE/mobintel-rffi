@@ -22,10 +22,10 @@ close all; clear; clc;
 
 DIR_IN = '/Users/stepanmazokha/Desktop/orbit_dataset/';
 
-% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-34-07', 'udp-2sec'));
+plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-34-07', 'udp-2sec'));
 % plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-53-51', 'silent-5sec'));
-plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-56-20', 'probes'));
-plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-07-02', 'probes'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-56-20', 'probes'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-07-02', 'probes'));
 plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-11-47', 'silent'));
 plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-19-38', 'probes'));
 

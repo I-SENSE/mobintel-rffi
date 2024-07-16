@@ -1,10 +1,13 @@
+import sys
 import os
 import time
+import llm
+import subprocess
 
 #                    1         2         3         4         5         6         7         8         9         10        11        12        13
 OFDM_CENTER_FREQ = ["2412e6", "2417e6", "2422e6", "2427e6", "2432e6", "2437e6", "2442e6", "2447e6", "2452e6", "2457e6", "2462e6", "2467e6", "2472e6"]
 
-JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # node via which we're connecting to the Grid
+JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # node via which we're connecting to the Grid
 # JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
 
 CORE_LOCAL_FOLDER = "/Users/stepanmazokha/Desktop/"
@@ -17,57 +20,84 @@ RX_FREQ = OFDM_CENTER_FREQ[RX_CHANNEL_IDX - 1]
 RX_GAIN = "10" # Chx Gain Value, Absolute (dB), range (for SBX): 0 - 31.5 dB
 RX_SAMP_RATE = "25e6" # Sampling rate, should be at least 20 Msps
 RX_SKIP = "1" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RATE
-# RX_CAP_LEN = "0.512"
 RX_CAP_LEN = "2" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE
-# RX_LO_OFF = "10e6"
 RX_LO_OFF = "0" # If the center freq is crowded, we can optionally tune it up (WiSig had it at 10 MHz)
+
+LLM_MAX_ATTEMPTS = 5
 
 def generate_dir_name():
     return time.strftime("epoch_%Y-%m-%d_%H-%M-%S", time.localtime())
 
-def send_command(needsJump, node, command):
+def send_command(needsJump, node, command, capture_response=False):
     if needsJump: 
         cmd = "ssh -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
     else: 
         cmd = "ssh %s \"%s\"" % (node, command)
 
     print(cmd)
-    os.system(cmd)
+    
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    
+    stdout_lines = []
+
+    while True:
+        stdout_line = process.stdout.readline()
+
+        if not stdout_line: 
+            break
+
+        if stdout_line:
+            print(stdout_line, end='')
+            if capture_response:
+                stdout_lines.append(stdout_line)
+        
+    if capture_response:
+        stdout, _ = process.communicate()
+        stdout_lines.append(stdout)    
+        return ''.join(stdout_lines)
+    else: return None
 
 def node_configure(node_id):
     send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
 
-    while True:
-        input('Hit enter when ready to proceed')
-        send_command(True, node_id, "ls /root/")
+    attempts = 0
+    while attempts < LLM_MAX_ATTEMPTS:
+        print('Sleeping for 30 seconds before attempting to connect.')
+        time.sleep(30)
+        
+        attempts += 1
 
-        instruction = input("Were you able to get a response? [Y/n]")
-        if instruction == 'Y':
+        can_proceed = llm.prompt_is_ls_successful(send_command(True, node_id, "ls /root/", capture_response=True))
+
+        if can_proceed:
             break
+        
+        if attempts == LLM_MAX_ATTEMPTS:
+            print("This was the last attempt. Node is dead. Quitting.")
+            return
 
     send_command(True, node_id, "sudo add-apt-repository ppa:gnuradio/gnuradio-releases")
-    send_command(True, node_id, "apt update")
-    send_command(True, node_id, "sudo apt install uhd-host net-tools wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0 rfkill")
+    send_command(True, node_id, "sudo apt-get update -y")
+    send_command(True, node_id, "sudo apt-get install -y uhd-host net-tools wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0 rfkill")
     send_command(True, node_id, "rfkill block wlan")
-    send_command(True, node_id, "uhd_find_devices")
-    send_command(True, node_id, "iwconfig")
 
-    while True:
-        instruction = input("Do we need to configure IP address to USRP? [Y/n]")
+    stdout = send_command(True, node_id, "ifconfig", capture_response=True)
 
-        if instruction == 'Y':
-            interface = input("Which interface should we use? (eth2 or DATA2 recommended)")
+    usrp_interface = llm.prompt_find_usrp_interface(stdout)
+
+    if usrp_interface is not 'NONE':
+        send_command(True, node_id, f"ifconfig {usrp_interface} 192.168.10.1 netmask 255.255.255.0 up")
+    else:
+        while True:
+            interface = input("Which interface should we use?")
             send_command(True, node_id, f"ifconfig {interface} 192.168.10.1 netmask 255.255.255.0 up")
             send_command(True, node_id, "uhd_find_devices")
 
             instruction = input("Did it work? [Y/any key]")
             if instruction == 'Y': break
             else: continue
-        elif instruction == 'n':
-            break
-        else: print("Invalid command")
 
     send_command(True, node_id, f'/usr/lib/uhd/examples/test_pps_input --args=\"{RX_USRP_IP}\" --source external')
 
@@ -75,8 +105,8 @@ def node_configure(node_id):
 
     # These commands take a long time to run, but are paramount for reducing background noise, etc
     send_command(True, node_id, 'uhd_cal_rx_iq_balance --verbose --args="addr=192.168.10.2"')
-    send_command(True, node_id, 'uhd_cal_tx_iq_balance --verbose --args="addr=192.168.10.2"')
-    send_command(True, node_id, 'uhd_cal_tx_dc_offset --verbose --args="addr=192.168.10.2"')
+    # send_command(True, node_id, 'uhd_cal_tx_iq_balance --verbose --args="addr=192.168.10.2"')
+    # send_command(True, node_id, 'uhd_cal_tx_dc_offset --verbose --args="addr=192.168.10.2"')
 
     print('Configure done')
 
@@ -98,10 +128,25 @@ def node_capture(tx_node_id, rx_node_id, local_dir):
     send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
     print('Capture done')
 
-def mode_rx(node_ids, local_folder, tx_node_id):
+def mode_rx(node_ids):
+    local_folder = input("Where should we store experiments of this run? (the folder MUST exist) ")
+    if local_folder == "": 
+        local_folder = "debug"
+    local_folder = os.path.join(CORE_LOCAL_FOLDER, local_folder)
+    if not os.path.exists(local_folder):
+        print("Root folder doesn't exist. We'll create it.")
+        os.mkdir(local_folder)
+
+    local_folder = os.path.join(local_folder, generate_dir_name())
+    os.mkdir(local_folder)
+
+    print("OK, we'll work here: " + local_folder)
+
     if len(node_ids) == 0:
         print('No nodes to emit from.')
         return
+    
+    tx_node_id = input("TX node ID: ")
 
     node_idx = 0
     while node_idx < len(node_ids):
@@ -146,22 +191,6 @@ def mode_config(node_ids):
 def main():
     print("Welcome! Let's get started.")
 
-    rootFolder = input("Where should we store experiments of this run? (the folder MUST exist) ")
-    if rootFolder == "": rootFolder = "debug"
-    rootFolder = os.path.join(CORE_LOCAL_FOLDER, rootFolder)
-
-    if not os.path.exists(rootFolder):
-        print("Root folder doesn't exist. We'll create it.")
-        os.mkdir(rootFolder)
-
-    rootFolder = os.path.join(rootFolder, generate_dir_name())
-
-    os.mkdir(rootFolder)
-
-    print("OK, we'll work here: " + rootFolder)
-
-    # tx_node_id = input("Which node are we emitting from? [nodeX-Y]")
-
     while True:
         instruction = input("What should we do? [config | config one | rx | rx one]")
 
@@ -171,17 +200,9 @@ def main():
             node_id = input("Which node should we configure? [nodeX-Y]")
             mode_config([node_id])
         elif instruction == 'rx':
-            temp = input(f"Which node are we emitting from? [nodeX-Y | enter to use {tx_node_id}]")
-            if len(temp) > 0:
-                print(f"OK, TX = {tx_node_id}")
-                tx_node_id = temp
-            mode_rx(RX_NODES, rootFolder, tx_node_id)
+            mode_rx(RX_NODES)
         elif instruction == 'rx one':
-            # temp = input(f"Which node are we emitting from? [nodeX-Y | enter to use {tx_node_id}]")
-            tx_node_id = input("TX node ID: ")
-            # rx_node_id = input("RX node ID: ")
-            rx_node_id = "node1-1"
-            mode_rx([rx_node_id], rootFolder, tx_node_id)
+            mode_rx(["node1-1"])
         else: print("Wrong command.")
 
 if __name__ == "__main__":

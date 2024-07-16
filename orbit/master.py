@@ -8,9 +8,9 @@ import tx_udp_master
 import tx_probe_master
 import rx_master
 import threading
+import random
 import queue
 import time
-import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 AP_NODE = "node2-5"
@@ -31,6 +31,12 @@ RX_CAP_LEN_PROBES = "10" # For how many seconds should we capture Probe Request 
 CONFIG_BATCH_SIZE = 5 # How many parallel config sessions should we run in parallel
 
 EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root dir for our experiment
+
+# Generates a 'virtual' MAC address (first 3 octets are the same, the remaining are randomized)
+def generate_virtual_mac():
+    random_octets = [random.randint(0x00, 0xFF) for _ in range(3)]
+    random_mac_part = ':'.join(f'{octet:02x}' for octet in random_octets)
+    return f'11:22:33:{random_mac_part}'
 
 # Performs simultaneous signal capture on all specified RX devices
 # - tx_node_id: identifier of the transmitting node (format: X-Y)
@@ -148,6 +154,7 @@ def run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, cap_len_sec
 # Runs a full experiment in udp mode
 def run_full_experiment_udp(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_node_id, experiment_dir, cap_len_sec, epochs):
     # 1. Perform data capture for the training devices
+    print(f"Running training capture [udp]")
     target_dir = rx_master.prepare_target_dir(experiment_dir, 'training_')
     os.mkdir(target_dir)
     for tx_node_id in tx_node_ids_train:
@@ -157,7 +164,7 @@ def run_full_experiment_udp(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap
 
     # 2. Run testing data capture for a given number of epochs
     for epoch_i in epochs:
-        print(f"Running epoch #{epoch_i + 1}")
+        print(f"Running epoch #{epoch_i + 1} [udp]")
 
         target_dir = rx_master.prepare_target_dir(experiment_dir, 'epoch_')
         os.mkdir(target_dir)
@@ -167,8 +174,27 @@ def run_full_experiment_udp(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap
         print(f"================ EPOCH #{epoch_i + 1} CAPTURE COMPLETE ================")
 
 # Runs a full experiment in probe mode
-def run_full_experiment_probe():
-    print('Work in progress')
+def run_full_experiment_probe(tx_node_ids_train, tx_node_ids_test, rx_node_ids, experiment_dir, channel, ssid, interval, cap_len_sec, epochs):
+    # 1. Perform data capture for the training devices
+    print(f"Running training capture [probes]")
+    target_dir = rx_master.prepare_target_dir(experiment_dir, 'training_')
+    os.mkdir(target_dir)
+    for tx_node_id in tx_node_ids_train:
+        mac = generate_virtual_mac() # produce a randomized (aka 'virtual') MAC address, unqiue for each epoch/device
+        run_capture_probes(tx_node_id, rx_node_ids, channel, mac, ssid, interval, target_dir, cap_len_sec)
+
+    print("================ TRAINING CAPTURE COMPLETE ================")
+
+    # 2. Run testing data capture for a given number of epochs
+    for epoch_i in epochs:
+        print(f"Running epoch #{epoch_i + 1} [probes]")
+
+        target_dir = rx_master.prepare_target_dir(experiment_dir, 'epoch_')
+        os.mkdir(target_dir)
+        for tx_node_id in tx_node_ids_test:
+            run_capture_probes(tx_node_id, rx_node_ids, channel, mac, ssid, interval, target_dir, cap_len_sec)
+
+        print(f"================ EPOCH #{epoch_i + 1} CAPTURE COMPLETE ================")
 
 def main():
     while True:
@@ -196,7 +222,8 @@ def main():
             run_capture_udp(tx_node_id, ap_node_id, RX_NODES, target_dir)
 
         elif instruction == 'run experiment probe':
-            run_full_experiment_probe()
+            epochs = int(input('How many epochs? (int only please): '))
+            run_full_experiment_probe(TX_TRAINING_NODES, TX_TESTING_NODES, RX_NODES, EXPERIMENT_DIR, TX_CHANNEL, TX_SSID, TX_INTERVAL, RX_CAP_LEN_PROBES, epochs)
         elif instruction == 'run experiment udp':
             epochs = int(input('How many epochs? (int only please): '))
             run_full_experiment_udp(TX_TRAINING_NODES, TX_TESTING_NODES, RX_NODES, AP_NODE, EXPERIMENT_DIR, RX_CAP_LEN_UDP, epochs)

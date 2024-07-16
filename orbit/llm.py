@@ -72,5 +72,18 @@ def prompt_find_usrp_interface(stdoutput):
     print(f"OpenAI says: {response}")
     return response
 
-    
+def prompt_find_wifi_interface(stdoutput):
+    prompt = f"""
+        I'm running a command 'iwconfig' on my system. Here's its output:
+
+        {stdoutput}
+
+        I need to identify the WiFi interface (Atheros) that I should configure.
+
+        Which interface I should be using? Provide only the name of the interface. If nothing available -- reply NONE.
+        """
+
+    response = extract_info_from_output(prompt)
+    print(f"OpenAI says: {response}")
+    return response
     

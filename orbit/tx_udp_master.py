@@ -1,14 +1,15 @@
 import os
 import time
 import subprocess
+import llm
 from multiprocessing import Process
 from collections import deque
 
 # TX command: cat /dev/urandom | netcat -u 192.168.16.1 55555
 # RX command: rm -rf /root/temp_node.dat && netcat -lu  192.168.16.1 55555 > "/root/temp_node.dat"
 
-JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
-JUMP_NODE_OUTDOOR = "smazokha@outdoor.orbit-lab.org"
+JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # Node via which we're connecting to the Grid
+JUMP_NODE_OUTDOOR = "smazokha@sb3.orbit-lab.org"
 # JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
 
 TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
@@ -18,6 +19,7 @@ TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 TX_INTERFACE = "wlp6s8mon" # Default name of the interface we'll set in monitor mode
 
 AP_NODE = "node1-2"
+LLM_MAX_ATTEMPTS = 6
 
 TX_NODES_TRAIN = ["node7-10", "node7-11", "node7-14", "node1-10", "node1-12", "node8-3", "node1-16", "node1-18",
                 "node1-19", "node8-8", "node2-6", "node8-18", "node8-20", "node2-19", "node3-13", "node3-18",
@@ -27,7 +29,7 @@ TX_NODES_TRAIN = ["node7-10", "node7-11", "node7-14", "node1-10", "node1-12", "n
 TX_NODES_TEST = ["node20-12", "node19-1", "node17-10", "node14-7", "node17-11", "node16-1", "node14-10", 
                  "node20-15", "node12-20", "node20-19", "node13-3", "node15-1", "node19-19", "node16-16", "node20-1"]
 
-def send_command(jump, node, command):
+def send_command(jump, node, command, capture_response=False):
     if jump == None:
         cmd = "ssh %s \"%s\"" % (node, command)
     elif jump == 'grid':
@@ -38,28 +40,56 @@ def send_command(jump, node, command):
         return
 
     print(cmd)
-    os.system(cmd)
 
-def node_configure_ap(node_id):
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    
+    stdout_lines = []
+
+    while True:
+        stdout_line = process.stdout.readline()
+
+        if not stdout_line: 
+            break
+
+        if stdout_line:
+            print(stdout_line, end='')
+            if capture_response:
+                stdout_lines.append(stdout_line)
+        
+    if capture_response:
+        stdout, _ = process.communicate()
+        stdout_lines.append(stdout)    
+        return ''.join(stdout_lines)
+    else: return None
+
+def node_configure_ap(node_id, driver_name="ath5k"):
     send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a offh -t " + node_id)
     send_command(None, JUMP_NODE_OUTDOOR, "omf load -i baseline.ndz -t " + node_id)
     send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a on -t " + node_id)
 
-    while True:
-        input('Hit enter when ready to proceed')
-        send_command('outdoor', node_id, "ls /root/")
+    attempts = 0
+    while attempts < LLM_MAX_ATTEMPTS:
+        print('Sleeping for 30 seconds before attempting to connect.')
+        time.sleep(30)
+        
+        attempts += 1
 
-        instruction = input("Were you able to get a response? [Y/n]")
-        if instruction == 'Y':
+        can_proceed = llm.prompt_is_ls_successful(send_command('outdoor', node_id, "ls /root/", capture_response=True))
+
+        if can_proceed:
             break
+        
+        if attempts == LLM_MAX_ATTEMPTS:
+            print("This was the last attempt. Node is dead. Quitting.")
+            return
 
-    send_command('outdoor', node_id, "apt update")
-    send_command('outdoor', node_id, "apt install network-manager wireless-tools net-tools hostapd wireless-tools tmux rfkill socat")
-    # send_command('outdoor', node_id, "modprobe ath5k")
-    send_command('outdoor', node_id, "ath10k_pci")
-    send_command('outdoor', node_id, "iwconfig")
-    
-    interface = input("Which interface should we use?")
+    send_command('outdoor', node_id, "sudo apt-get update -y")
+    send_command('outdoor', node_id, "sudo apt-get install -y network-manager wireless-tools net-tools hostapd wireless-tools tmux rfkill socat")
+    send_command('outdoor', node_id, f"modprobe {driver_name}")
+
+    interface = llm.prompt_find_wifi_interface(send_command('outdoor', node_id, "iwconfig", capture_response=True))
+    if interface == 'NONE':
+        interface = input("Which interface should we use?")
 
     command_hostapd = f"""
 sudo bash -c 'cat <<EOF > /etc/hostapd/hostapd.conf
@@ -119,20 +149,30 @@ def node_configure_tx(node_id):
     send_command(None, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(None, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
 
-    while True:
-        input('Hit enter when ready to proceed')
-        send_command('grid', node_id, "ls /root/")
+    attempts = 0
+    while attempts < LLM_MAX_ATTEMPTS:
+        print('Sleeping for 30 seconds before attempting to connect.')
+        time.sleep(30)
+        
+        attempts += 1
 
-        instruction = input("Were you able to get a response? [Y/n]")
-        if instruction == 'Y':
+        can_proceed = llm.prompt_is_ls_successful(send_command('grid', node_id, "ls /root/", capture_response=True))
+
+        if can_proceed:
             break
+        
+        if attempts == LLM_MAX_ATTEMPTS:
+            print("This was the last attempt. Node is dead. Quitting.")
+            return
 
-    send_command('grid', node_id, "apt update")
-    send_command('grid', node_id, "apt install net-tools network-manager hostapd wireless-tools rfkill tmux socat")
+    send_command('grid', node_id, "sudo apt-get -y update")
+    send_command('grid', node_id, "sudo apt-get -y install net-tools network-manager hostapd wireless-tools rfkill tmux socat")
     send_command('grid', node_id, "modprobe ath5k")
-    send_command('grid', node_id, "iwconfig")
 
-    interface = input("Which interface should we use?")
+    interface = llm.prompt_find_wifi_interface(send_command('grid', node_id, "iwconfig", capture_response=True))
+
+    if interface == 'NONE':
+        interface = input("Which interface should we use?")
 
     send_command('grid', node_id, f"ip link set {interface} up")
     send_command('grid', node_id, "systemctl start network-manager")
@@ -192,9 +232,11 @@ def main():
             node_configure_tx(node_id)
 
         elif tx_type == "config ap":
-            # node_id = input("AP node ID: ")
-            node_id = "node2-5"
-            node_configure_ap(node_id)
+            # node_id = "node2-5"
+            # node_configure_ap(node_id, driver_name="ath10k_pci") # use when AP is in outdoor env
+
+            node_id = input("AP node ID: ")
+            node_configure_ap(node_id) # use when AP has our main Atheros driver
 
         elif tx_type == "emit one":
             tx_node_id = input("TX node ID: ")

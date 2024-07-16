@@ -23,7 +23,7 @@ RX_SKIP = "1" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RAT
 RX_CAP_LEN = "2" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE
 RX_LO_OFF = "0" # If the center freq is crowded, we can optionally tune it up (WiSig had it at 10 MHz)
 
-LLM_MAX_ATTEMPTS = 5
+LLM_MAX_ATTEMPTS = 6
 
 def generate_dir_name():
     return time.strftime("epoch_%Y-%m-%d_%H-%M-%S", time.localtime())

@@ -18,7 +18,7 @@ RX_FREQ = OFDM_CENTER_FREQ[RX_CHANNEL_IDX - 1]
 RX_GAIN = "10" # Chx Gain Value, Absolute (dB), range (for SBX): 0 - 31.5 dB
 RX_SAMP_RATE = "25e6" # Sampling rate, should be at least 20 Msps
 RX_SKIP = "1" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RATE
-RX_CAP_LEN = "2" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE # TODO: change to larger number for probe capture
+RX_CAP_LEN = "2" # For how long do we capture samples (in seconds)
 RX_LO_OFF = "0" # If the center freq is crowded, we can optionally tune it up (WiSig had it at 10 MHz)
 LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
 
@@ -110,15 +110,15 @@ def node_configure(node_id):
 
     print(f'RX node {node_id} configured.')
 
-def node_capture(tx_node_id, rx_node_id, local_dir):
+def node_capture(tx_node_id, rx_node_id, local_dir, cap_len_sec):
     # 0. Remove any residual files, if any
     send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
 
     # 1. Launch capture
-    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --device=\"{RX_USRP_IP}\" --cap-len={RX_CAP_LEN} --output-file=\"{CORE_RX_FILE}\" --rx-freq={RX_FREQ} --rx-gain={RX_GAIN} --rx-lo-off={RX_LO_OFF} --rx-samp-rate={RX_SAMP_RATE} --skip={RX_SKIP}')
+    send_command(True, rx_node_id, f'/root/gnuradio-n210/receive_capture.py --device=\"{RX_USRP_IP}\" --cap-len={cap_len_sec} --output-file=\"{CORE_RX_FILE}\" --rx-freq={RX_FREQ} --rx-gain={RX_GAIN} --rx-lo-off={RX_LO_OFF} --rx-samp-rate={RX_SAMP_RATE} --skip={RX_SKIP}')
 
     # 2. Download file to local device
-    filename = f"tx{{node_{tx_node_id}}}_rx{{node_{rx_node_id}+rxFreq_{RX_FREQ}+rxGain_{RX_GAIN}+capLen_{RX_CAP_LEN}+rxSampRate_{RX_SAMP_RATE}}}.dat"
+    filename = f"tx{{node_{tx_node_id}}}_rx{{node_{rx_node_id}+rxFreq_{RX_FREQ}+rxGain_{RX_GAIN}+capLen_{cap_len_sec}+rxSampRate_{RX_SAMP_RATE}}}.dat"
     path_local = os.path.join(local_dir, filename)
     command = f"scp -J {JUMP_NODE_GRID} root@{rx_node_id}:{CORE_RX_FILE} {path_local}"
     print(command)
@@ -156,7 +156,7 @@ def mode_rx(node_ids):
         instruction = input(f"Ready to RX on {rx_node_id}? [Y/skip/done]")
 
         if instruction == 'Y':
-            node_capture(tx_node_id, rx_node_id, target_folder)
+            node_capture(tx_node_id, rx_node_id, target_folder, RX_CAP_LEN)
             node_idx = node_idx + 1
         elif instruction == 'skip':
             node_idx = node_idx + 1

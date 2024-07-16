@@ -25,17 +25,19 @@ TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (i
 TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 
-CONFIG_BATCH_SIZE = 5
-CAPTURE_DURATION_SEC = 20
+RX_CAP_LEN_UDP = "2" # For how many seconds should we capture UDP traffic
+RX_CAP_LEN_PROBES = "10" # For how many seconds should we capture Probe Request traffoc
 
-EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/'
+CONFIG_BATCH_SIZE = 5 # How many parallel config sessions should we run in parallel
+
+EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root dir for our experiment
 
 # Performs simultaneous signal capture on all specified RX devices
 # - tx_node_id: identifier of the transmitting node (format: X-Y)
 # - rx_node_id: identifier of the receiving node (format: X-Y)
 # - target_dir: directory where the signal should be stored
 # - start_event, stop_event: thread events to control task execution
-def command_rx(tx_node_id, rx_node_id, target_dir, start_event, stop_event):
+def command_rx(tx_node_id, rx_node_id, cap_len_sec, target_dir, start_event):
     print(f"RX: {tx_node_id} -> {rx_node_id}: Starting...")
     try:
         # Wait for the start signal
@@ -43,11 +45,7 @@ def command_rx(tx_node_id, rx_node_id, target_dir, start_event, stop_event):
 
         print(f"RX: {tx_node_id} -> {rx_node_id}: Running...")
 
-        rx_master.node_capture(tx_node_id, rx_node_id, target_dir)
-
-        # Wait for the stop signal (optional)
-        print(f"RX: {tx_node_id} -> {rx_node_id}: Done, waiting...")
-        stop_event.wait()
+        rx_master.node_capture(tx_node_id, rx_node_id, target_dir, cap_len_sec)
 
         print(f"RX: {tx_node_id} -> {rx_node_id}: Completed.")
     except Exception as e:
@@ -106,60 +104,54 @@ def run_config(tx_node_ids, rx_node_ids, ap_node_ids, tx_mode, batch_size, tx_ch
 # - rx_node_ids: identifiers of the RX nodes that are capturing signal
 # - tx_node_id: identifier of the TX node that emits signal (for file naming only)
 # - target_dir: directory where we'll save the file with IQ samples
-# - capture_duration_sec: how long we'll wait for signal to be captured
-def run_rx(tx_node_id, rx_node_ids, target_dir, capture_duration_sec):
+def run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir):
     start_event = threading.Event()
-    stop_event = threading.Event()
 
     # 1. Configure and start all threads
     threads = []
     for rx_node_id in rx_node_ids:
-        thread = threading.Thread(target=command_rx, args=(tx_node_id, rx_node_id, target_dir, start_event, stop_event))
+        thread = threading.Thread(target=command_rx, args=(tx_node_id, rx_node_id, cap_len_sec, target_dir, start_event))
         thread.start()
         threads.append(thread)
 
     # 2. Launch signal capture on all threads simultaneously
     start_event.set()
 
-    # 3. Wait for N seconds for the capture to be completed
-    time.sleep(capture_duration_sec)
-
-    # 4. Stop all threads simultaneously and wait for them to finish
-    stop_event.set()
+    # 3. Wait for the threads to finish
     for thread in threads:
         thread.join()
 
 # Runs a single transmission task, probe request mode
-def run_capture_probes(tx_node_id, rx_node_ids, channel, mac, ssid, interval, target_dir, capture_duration_sec):
+def run_capture_probes(tx_node_id, rx_node_ids, channel, mac, ssid, interval, target_dir, cap_len_sec):
     # Start transmission
     wifi_interface = tx_probe_master.node_emit_start(tx_node_id, channel, mac, ssid, interval)
     time.sleep(5) # wait while the tmux session starts on TX device
 
     # Perform capture
-    run_rx(tx_node_id, rx_node_ids, target_dir, capture_duration_sec)
+    run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir)
 
     # Stop transmission
     tx_probe_master.node_emit_stop(tx_node_id, wifi_interface)
 
 # Runs a single transmission task, udp mode
-def run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, capture_duration_sec):
+def run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, cap_len_sec):
     # Start transmission
     tx_udp_master.node_transmission_start(tx_node_id, ap_node_id)
     time.sleep(5) # wait while the tmux session starts on TX device
 
     # Perform capture
-    run_rx(tx_node_id, rx_node_ids, target_dir, capture_duration_sec)
+    run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir)
 
     # Stop transmission
     tx_udp_master.node_transmission_stop(tx_node_id, ap_node_id)
 
 # Runs a full experiment in udp mode
-def run_full_experiment_udp(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_node_id, experiment_dir, capture_duration_sec, epochs):
+def run_full_experiment_udp(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_node_id, experiment_dir, cap_len_sec, epochs):
     # 1. Perform data capture for the training devices
     target_dir = rx_master.prepare_target_dir(experiment_dir, 'training_')
     os.mkdir(target_dir)
     for tx_node_id in tx_node_ids_train:
-        run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, capture_duration_sec)
+        run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, cap_len_sec)
 
     print("================ TRAINING CAPTURE COMPLETE ================")
 
@@ -170,9 +162,13 @@ def run_full_experiment_udp(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap
         target_dir = rx_master.prepare_target_dir(experiment_dir, 'epoch_')
         os.mkdir(target_dir)
         for tx_node_id in tx_node_ids_test:
-            run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, capture_duration_sec)
+            run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, cap_len_sec)
 
         print(f"================ EPOCH #{epoch_i + 1} CAPTURE COMPLETE ================")
+
+# Runs a full experiment in probe mode
+def run_full_experiment_probe():
+    print('Work in progress')
 
 def main():
     while True:
@@ -188,7 +184,7 @@ def main():
 
             if not os.path.exists(target_dir): os.mkdir(target_dir)
 
-            run_capture_probes(tx_node_id, RX_NODES, TX_CHANNEL, TX_MAC, TX_SSID, TX_SSID, target_dir, CAPTURE_DURATION_SEC)
+            run_capture_probes(tx_node_id, RX_NODES, TX_CHANNEL, TX_MAC, TX_SSID, TX_SSID, target_dir)
 
         elif instruction == 'emit udp':
             tx_node_id = input('TX node ID: ') # 'node14-7'
@@ -197,13 +193,13 @@ def main():
 
             if not os.path.exists(target_dir): os.mkdir(target_dir)
 
-            run_capture_udp(tx_node_id, ap_node_id, RX_NODES, target_dir, CAPTURE_DURATION_SEC)
+            run_capture_udp(tx_node_id, ap_node_id, RX_NODES, target_dir)
 
         elif instruction == 'run experiment probe':
-            print('Work in progress')
+            run_full_experiment_probe()
         elif instruction == 'run experiment udp':
             epochs = int(input('How many epochs? (int only please): '))
-            run_full_experiment_udp(TX_TRAINING_NODES, TX_TESTING_NODES, RX_NODES, AP_NODE, EXPERIMENT_DIR, CAPTURE_DURATION_SEC, epochs)
+            run_full_experiment_udp(TX_TRAINING_NODES, TX_TESTING_NODES, RX_NODES, AP_NODE, EXPERIMENT_DIR, RX_CAP_LEN_UDP, epochs)
         else: print('Invalid command.')
 
 if __name__ == "__main__":

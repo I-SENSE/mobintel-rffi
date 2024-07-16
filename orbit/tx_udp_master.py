@@ -5,8 +5,8 @@ import llm
 from multiprocessing import Process
 from collections import deque
 
-JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # grid.orbit-lab.org
-JUMP_NODE_OUTDOOR = "smazokha@sb3.orbit-lab.org" # outdoor.orbit-lab.org
+JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # grid.orbit-lab.org
+JUMP_NODE_OUTDOOR = "smazokha@grid.orbit-lab.org" # outdoor.orbit-lab.org
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
 

@@ -1,50 +1,70 @@
 import os
 import time
 import subprocess
+import llm
 from multiprocessing import Process
 from collections import deque
 
-JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
-# JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
+JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # Node via which we're connecting to the Grid
 
-TX_INTERVAL = "0.05" # Interval (in seconds) between injected probe requests
+TX_INTERVAL = "0.1" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
 TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
-TX_INTERFACE = "wlp6s8mon" # Default name of the interface we'll set in monitor mode
+TX_INTERFACE = "wlp6s8" # Default name of the interface we'll set in monitor mode
+LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
 
-TX_NODES_TRAIN = ["node7-10", "node7-11", "node7-14", "node1-10", "node1-12", "node8-3", "node1-16", "node1-18",
-                "node1-19", "node8-8", "node2-6", "node8-18", "node8-20", "node2-19", "node3-13", "node3-18",
-                "node10-7", "node4-1", "node10-11", "node10-17", "node4-10", "node4-11", "node11-1", "node11-4",
-                "node11-7", "node5-1", "node5-5", "node11-17", "node6-1", "node6-15"]
-                
-TX_NODES_TEST = ["node20-12", "node19-1", "node17-10", "node14-7", "node17-11", "node16-1", "node14-10", 
-                 "node20-15", "node12-20", "node20-19", "node13-3", "node15-1", "node19-19", "node16-16", "node20-1"]
-
-def send_command(needsJump, node, command):
+def send_command(needsJump, node, command, capture_response=False):
     if needsJump: 
         cmd = "ssh -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
     else: 
         cmd = "ssh %s \"%s\"" % (node, command)
 
     print(cmd)
-    os.system(cmd)
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    
+    stdout_lines = []
+
+    while True:
+        stdout_line = process.stdout.readline()
+
+        if not stdout_line: 
+            break
+
+        if stdout_line:
+            print(stdout_line, end='')
+            if capture_response:
+                stdout_lines.append(stdout_line)
+        
+    if capture_response:
+        stdout, _ = process.communicate()
+        stdout_lines.append(stdout)    
+        return ''.join(stdout_lines)
+    else: return None
 
 def node_configure(node_id):
     send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
 
-    while True:
-        input('Hit enter when ready to proceed')
-        send_command(True, node_id, "ls /root/")
+    attempts = 0
+    while attempts < LLM_MAX_ATTEMPTS:
+        print('Sleeping for 30 seconds before attempting to connect.')
+        time.sleep(30)
+        
+        attempts += 1
 
-        instruction = input("Were you able to get a response? [Y/n]")
-        if instruction == 'Y':
+        can_proceed = llm.prompt_is_ls_successful(send_command(True, node_id, "ls /root/", capture_response=True))
+
+        if can_proceed:
             break
+        
+        if attempts == LLM_MAX_ATTEMPTS:
+            print("This was the last attempt. Node is dead. Quitting.")
+            return
 
-    send_command(True, node_id, "apt update")
-    send_command(True, node_id, "apt install network-manager net-tools hostapd wireless-tools tmux python3-pip aircrack-ng git")
+    send_command(True, node_id, "sudo apt-get -y update")
+    send_command(True, node_id, "sudo apt-get -y install network-manager net-tools hostapd wireless-tools tmux python3-pip aircrack-ng git")
     send_command(True, node_id, "pip3 install scapy")
     send_command(True, node_id, "modprobe ath5k")
     send_command(True, node_id, "rfkill block wlan")
@@ -52,38 +72,36 @@ def node_configure(node_id):
 
     print('Configured.')
 
-def node_emit(node_id, interface=TX_INTERFACE, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, interval=TX_INTERVAL):
+def node_emit(node_id, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, interval=TX_INTERVAL):
     send_command(True, node_id, "rfkill unblock wlan")
-    
-    while True:
-        send_command(True, node_id, "iwconfig")
-        interface = input("What interface should we use?")
+    time.sleep(2)
+    command_response = send_command(True, node_id, "iwconfig", capture_response=True)
+    if command_response.__contains__(TX_INTERFACE):
+        interface = TX_INTERFACE
+    else:
+        interface = llm.prompt_find_wifi_interface()
+        if interface == 'NONE':
+            interface = input("Which interface should we use?")
+        
+    send_command(True, node_id, f"airmon-ng start {interface}") # airmon ads postfix 'mon' to the newly created interface
+    send_command(True, node_id, "tmux kill-session -t emit")
 
-        send_command(True, node_id, f"airmon-ng start {interface}")
-        send_command(True, node_id, "tmux kill-session -t emit")
+    # Note #1: probe emission code has been developed by Fanchen for one of our previous projects. 
+    #          But this code provides an easy interface for emitting probe requests. 
+    #          Importantly, the probes will be emitted for as long as the tmux sesh is running. 
+    #          So, that's why we need to kill the session once we captured our data on the RX side.
+    # 
+    # Note #2: The TX power functionality of the Fanchen's repo is not applicable in our case. We 
+    #          cannot change TX power on the grid, because the Atheros chipsets we can use has the
+    #          regional power limits written in EEPROM. Therefore, any attempts to change the TX 
+    #          power won't work.
+    #          Ref: https://wiki.archlinux.org/title/Network_configuration/Wireless#:~:text=However%2C%20setting%20the,maximum%20of%2030dBm
+    # 
+    # TODO:    Determine most optimal interval for probe emission. Update the matlab IQ parser accordingly.
+    send_command(True, node_id, f"/root/probe_request_injection/emit/emit.sh -i {interface}mon -c {channel} --mac {mac} --interval {interval} --ssid {ssid}")
 
-        # Note #1: probe emission code has been developed by Fanchen for one of our previous projects. 
-        #          But this code provides an easy interface for emitting probe requests. 
-        #          Importantly, the probes will be emitted for as long as the tmux sesh is running. 
-        #          So, that's why we need to kill the session once we captured our data on the RX side.
-        # 
-        # Note #2: The TX power functionality of the Fanchen's repo is not applicable in our case. We 
-        #          cannot change TX power on the grid, because the Atheros chipsets we can use has the
-        #          regional power limits written in EEPROM. Therefore, any attempts to change the TX 
-        #          power won't work.
-        #          Ref: https://wiki.archlinux.org/title/Network_configuration/Wireless#:~:text=However%2C%20setting%20the,maximum%20of%2030dBm
-        # 
-        # TODO:    Determine most optimal interval for probe emission. Update the matlab IQ parser accordingly.
-        send_command(True, node_id, f"/root/probe_request_injection/emit/emit.sh -i {interface}mon -c {channel} --mac {mac} --interval {interval} --ssid {ssid}")
-
-        command = input("What now? [emit/enter (to stop)]")
-
-        if command == 'emit':
-            continue
-        else: 
-            send_command(True, node_id, f"airmon-ng stop {interface}mon")
-            break
-
+    input("Hit enter to stop.")
+    send_command(True, node_id, f"airmon-ng stop {interface}mon")
     send_command(True, node_id, "tmux kill-session -t emit")
     send_command(True, node_id, "rfkill block wlan")
 
@@ -134,18 +152,12 @@ def mode_config(nodes):
 def main():
     print("Welcome!. Let's get started.")
     while True:
-        tx_type = input("What should we do? [config | config one | emit train | emit test | emit one] ")
-        if tx_type == 'config':
-            mode_config(TX_NODES_TRAIN + TX_NODES_TEST)
-        elif tx_type == 'config one':
-            node_id = input('Type node ID (nodeX-Y): ')
+        tx_type = input("What should we do? [config one | emit one] ")
+        if tx_type == 'config one':
+            node_id = input('TX node ID: ')
             mode_config([node_id])
-        elif tx_type == 'emit train':
-            mode_emit(TX_NODES_TRAIN)
-        elif tx_type == 'emit test':
-            mode_emit(TX_NODES_TEST)
         elif tx_type == 'emit one':
-            node_id = input('Type node ID (nodeX-Y): ')
+            node_id = input('TX node ID: ')
             mode_emit([node_id])
         else: print("Wrong command.")
         

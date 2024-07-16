@@ -6,9 +6,10 @@ import subprocess
 # Channel Number:   1         2         3         4         5         6         7         8         9         10        11        12        13
 OFDM_CENTER_FREQ = ["2412e6", "2417e6", "2422e6", "2427e6", "2432e6", "2437e6", "2442e6", "2447e6", "2452e6", "2457e6", "2462e6", "2467e6", "2472e6"]
 
-JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # grid.orbit-lab.org
+JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # grid.orbit-lab.org
 
 CORE_LOCAL_FOLDER = "/Users/stepanmazokha/Desktop/"
+CORE_LOCAL_DATASET_NAME = "orbit_dataset"
 CORE_RX_FILE = "/root/samples.dat"
 
 RX_CHANNEL_IDX = 11 # 1-based value, according to 802.11 standard
@@ -104,7 +105,7 @@ def node_configure(node_id):
     # send_command(True, node_id, 'uhd_cal_tx_iq_balance --verbose --args="addr=192.168.10.2"')
     # send_command(True, node_id, 'uhd_cal_tx_dc_offset --verbose --args="addr=192.168.10.2"')
 
-    print('Configure done')
+    print(f'RX node {node_id} configured.')
 
 def node_capture(tx_node_id, rx_node_id, local_dir):
     # 0. Remove any residual files, if any
@@ -122,13 +123,14 @@ def node_capture(tx_node_id, rx_node_id, local_dir):
 
     # 3. Delete file on the node
     send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
-    print('Capture done')
+    print(f'Capture completed for TX {tx_node_id}].')
 
 def mode_rx(node_ids):
-    local_folder = input("Where should we store experiments of this run? (the folder MUST exist) ")
-    if local_folder == "": 
-        local_folder = "debug"
+    local_folder = input("We'll store data on the desktop. What should be the folder name?")
+
+    if local_folder == "": local_folder = CORE_LOCAL_DATASET_NAME
     local_folder = os.path.join(CORE_LOCAL_FOLDER, local_folder)
+
     if not os.path.exists(local_folder):
         print("Root folder doesn't exist. We'll create it.")
         os.mkdir(local_folder)

@@ -84,7 +84,7 @@ def node_configure(node_id):
 
     usrp_interface = llm.prompt_find_usrp_interface(stdout)
 
-    if usrp_interface is not 'NONE':
+    if usrp_interface != 'NONE':
         send_command(True, node_id, f"ifconfig {usrp_interface} 192.168.10.1 netmask 255.255.255.0 up")
     else:
         while True:

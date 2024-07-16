@@ -28,7 +28,7 @@ def extract_info_from_output(prompt, model="gpt-4o"):
         presence_penalty=0
     )
 
-    return response.choices[0].message.content
+    return response.choices[0].message.content.strip()
 
 def prompt_is_ls_successful(stdoutput):
     prompt = f"""

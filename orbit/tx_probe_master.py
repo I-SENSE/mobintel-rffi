@@ -5,7 +5,7 @@ import llm
 from multiprocessing import Process
 from collections import deque
 
-JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # Node via which we're connecting to the Grid
+JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
 
 TX_INTERVAL = "0.1" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
@@ -79,7 +79,7 @@ def node_emit(node_id, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, interval=TX
     if command_response.__contains__(TX_INTERFACE):
         interface = TX_INTERFACE
     else:
-        interface = llm.prompt_find_wifi_interface()
+        interface = llm.prompt_find_wifi_interface(command_response)
         if interface == 'NONE':
             interface = input("Which interface should we use?")
         

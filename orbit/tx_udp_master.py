@@ -6,7 +6,7 @@ from multiprocessing import Process
 from collections import deque
 
 JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # grid.orbit-lab.org
-JUMP_NODE_OUTDOOR = "smazokha@grid.orbit-lab.org" # outdoor.orbit-lab.org
+JUMP_NODE_OUTDOOR = "smazokha@outdoor.orbit-lab.org" # outdoor.orbit-lab.org
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
 
@@ -202,12 +202,12 @@ def main():
 
         elif tx_type == "config ap":
             # Use this code when AP is an Outdoor node
-            # node_id = "node2-5"
-            # node_configure_ap(node_id, driver_name="ath10k_pci") # use when AP is in outdoor env
+            node_id = input("AP node ID [ath10k_pci]: ")
+            node_configure_ap(node_id, driver_name="ath10k_pci") # use when AP is in outdoor env
 
             # Use this code when AP is an SB3 node
-            node_id = input("AP node ID: ")
-            node_configure_ap(node_id) # use when AP has our main Atheros driver
+            # node_id = input("AP node ID [ath5k]: ")
+            # node_configure_ap(node_id) # use when AP has our main Atheros driver
 
         elif tx_type == "emit one":
             tx_node_id = input("TX node ID: ")

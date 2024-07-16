@@ -86,4 +86,3 @@ def prompt_find_wifi_interface(stdoutput):
     response = extract_info_from_output(prompt)
     print(f"OpenAI says: {response}")
     return response
-    

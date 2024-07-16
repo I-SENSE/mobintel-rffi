@@ -1,18 +1,15 @@
-import sys
 import os
 import time
 import llm
 import subprocess
 
-#                    1         2         3         4         5         6         7         8         9         10        11        12        13
+# Channel Number:   1         2         3         4         5         6         7         8         9         10        11        12        13
 OFDM_CENTER_FREQ = ["2412e6", "2417e6", "2422e6", "2427e6", "2432e6", "2437e6", "2442e6", "2447e6", "2452e6", "2457e6", "2462e6", "2467e6", "2472e6"]
 
-JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # node via which we're connecting to the Grid
-# JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
+JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # grid.orbit-lab.org
 
 CORE_LOCAL_FOLDER = "/Users/stepanmazokha/Desktop/"
 CORE_RX_FILE = "/root/samples.dat"
-RX_NODES = ["node1-1"]
 
 RX_CHANNEL_IDX = 11 # 1-based value, according to 802.11 standard
 RX_USRP_IP = "addr=192.168.10.2"
@@ -22,8 +19,7 @@ RX_SAMP_RATE = "25e6" # Sampling rate, should be at least 20 Msps
 RX_SKIP = "1" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RATE
 RX_CAP_LEN = "2" # How many samples (N) do we capture, where N = RX_CAP_LEN * RX_SAMP_RATE
 RX_LO_OFF = "0" # If the center freq is crowded, we can optionally tune it up (WiSig had it at 10 MHz)
-
-LLM_MAX_ATTEMPTS = 6
+LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
 
 def generate_dir_name():
     return time.strftime("epoch_%Y-%m-%d_%H-%M-%S", time.localtime())
@@ -192,17 +188,14 @@ def main():
     print("Welcome! Let's get started.")
 
     while True:
-        instruction = input("What should we do? [config | config one | rx | rx one]")
+        instruction = input("What should we do? [config one | rx one]")
 
-        if instruction == 'config':
-            mode_config(RX_NODES)
-        elif instruction == 'config one':
-            node_id = input("Which node should we configure? [nodeX-Y]")
+        if instruction == 'config one':
+            node_id = input("RX node ID: ")
             mode_config([node_id])
-        elif instruction == 'rx':
-            mode_rx(RX_NODES)
         elif instruction == 'rx one':
-            mode_rx(["node1-1"])
+            node_id = input('RX node ID: ')
+            mode_rx([node_id])
         else: print("Wrong command.")
 
 if __name__ == "__main__":

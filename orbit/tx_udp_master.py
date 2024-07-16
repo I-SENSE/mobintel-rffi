@@ -5,29 +5,10 @@ import llm
 from multiprocessing import Process
 from collections import deque
 
-# TX command: cat /dev/urandom | netcat -u 192.168.16.1 55555
-# RX command: rm -rf /root/temp_node.dat && netcat -lu  192.168.16.1 55555 > "/root/temp_node.dat"
-
-JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # Node via which we're connecting to the Grid
-JUMP_NODE_OUTDOOR = "smazokha@sb3.orbit-lab.org"
-# JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org"
-
-TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
-TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
-TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
+JUMP_NODE_GRID = "smazokha@sb3.orbit-lab.org" # grid.orbit-lab.org
+JUMP_NODE_OUTDOOR = "smazokha@sb3.orbit-lab.org" # outdoor.orbit-lab.org
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
-TX_INTERFACE = "wlp6s8mon" # Default name of the interface we'll set in monitor mode
-
-AP_NODE = "node1-2"
-LLM_MAX_ATTEMPTS = 6
-
-TX_NODES_TRAIN = ["node7-10", "node7-11", "node7-14", "node1-10", "node1-12", "node8-3", "node1-16", "node1-18",
-                "node1-19", "node8-8", "node2-6", "node8-18", "node8-20", "node2-19", "node3-13", "node3-18",
-                "node10-7", "node4-1", "node10-11", "node10-17", "node4-10", "node4-11", "node11-1", "node11-4",
-                "node11-7", "node5-1", "node5-5", "node11-17", "node6-1", "node6-15"]
-                
-TX_NODES_TEST = ["node20-12", "node19-1", "node17-10", "node14-7", "node17-11", "node16-1", "node14-10", 
-                 "node20-15", "node12-20", "node20-19", "node13-3", "node15-1", "node19-19", "node16-16", "node20-1"]
+LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
 
 def send_command(jump, node, command, capture_response=False):
     if jump == None:
@@ -181,42 +162,30 @@ def node_configure_tx(node_id):
     send_command('grid', node_id, "rfkill block wlan")
     print("TX setup complete.")
     
-def node_transmit(tx_node_id, ap_node_id):
+def node_transmission_start(tx_node_id, ap_node_id):
     send_command('grid', tx_node_id, "rfkill unblock wlan")
     time.sleep(2)
+    send_command('grid', tx_node_id, 'nmcli dev wifi | grep "mobloc_wlan"')
 
-    while True:
-        # input("Hit when you're ready to check for WiFi availability...")
-        send_command('grid', tx_node_id, 'nmcli dev wifi | grep "mobloc_wlan"')
-        answer = input("Do you see WiFi network 'mobloc_wlan'? [hit/n]")
-        if answer is not 'n':
-            break
+    # while True:
+    #     # input("Hit when you're ready to check for WiFi availability...")
+    #     send_command('grid', tx_node_id, 'nmcli dev wifi | grep "mobloc_wlan"')
+    #     answer = input("Do you see WiFi network 'mobloc_wlan'? [hit/n]")
+    #     if answer is not 'n':
+    #         break
 
     send_command('grid', tx_node_id, "nmcli connection up mobloc")
     send_command('grid', tx_node_id, "ping 192.168.16.1 -c 2")
 
     input("Ready to start transmission?")
-    
-    # command_tx_start = "tmux new-session -d -s emit 'cat /dev/urandom | netcat -u 192.168.16.1 55555'"
-    # command_ap_start = "tmux new-session -d -s receive 'netcat -lu  192.168.16.1 55555 > \"/root/temp_node.dat\"'"
 
-    command_tx_start = "tmux new-session -d -s emit 'cat /dev/urandom | socat - UDP-SENDTO:192.168.16.1:55555'"
-    command_ap_start = "tmux new-session -d -s receive 'socat - UDP-RECV:55555 > \"/root/temp_node.dat\"'"
-
-    command_tx_stop = "tmux kill-session -t emit"
-    command_ap_stop = "tmux kill-session -t receive"
-
-    # send_command('outdoor', ap_node_id, "rm -rf /root/temp_node.dat")
-    # send_command('outdoor', ap_node_id, command_ap_stop)
-    # send_command('grid', tx_node_id, command_tx_stop)
-
-    send_command('outdoor', ap_node_id, command_ap_start)
+    send_command('outdoor', ap_node_id, "tmux new-session -d -s receive 'socat - UDP-RECV:55555 > \"/root/temp_node.dat\"'")
     time.sleep(2) # let AP set up the receival
-    send_command('grid', tx_node_id, command_tx_start)
+    send_command('grid', tx_node_id, "tmux new-session -d -s emit 'cat /dev/urandom | socat - UDP-SENDTO:192.168.16.1:55555'")
 
-    input("Transmission is in progress. Start reception. Hit to stop.")
-    send_command('outdoor', ap_node_id, command_ap_stop)
-    send_command('grid', tx_node_id, command_tx_stop)
+def node_transmission_stop(tx_node_id, ap_node_id):
+    send_command('outdoor', ap_node_id, "tmux kill-session -t receive")
+    send_command('grid', tx_node_id, "tmux kill-session -t emit")
     send_command('grid', tx_node_id, "rfkill block wlan")
     send_command('outdoor', ap_node_id, "rm -rf /root/temp_node.dat")
 
@@ -232,17 +201,21 @@ def main():
             node_configure_tx(node_id)
 
         elif tx_type == "config ap":
+            # Use this code when AP is an Outdoor node
             # node_id = "node2-5"
             # node_configure_ap(node_id, driver_name="ath10k_pci") # use when AP is in outdoor env
 
+            # Use this code when AP is an SB3 node
             node_id = input("AP node ID: ")
             node_configure_ap(node_id) # use when AP has our main Atheros driver
 
         elif tx_type == "emit one":
             tx_node_id = input("TX node ID: ")
-            # ap_node_id = input("AP node ID: ")
-            ap_node_id = "node2-5"
-            node_transmit(tx_node_id, ap_node_id)
+            ap_node_id = input("AP node ID: ")
+
+            node_transmission_start(tx_node_id, ap_node_id)
+            input("Transmission is in progress. Start reception. Hit to stop.")
+            node_transmission_stop(tx_node_id, ap_node_id)
 
         else: print("Wrong command.")
         

@@ -2,16 +2,15 @@ import time
 import subprocess
 from openai_client import OpenAIClient
 
-JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
-
 TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
 TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 TX_INTERFACE = "wlp6s8" # Default name of the interface we'll set in monitor mode
 LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
-
 WIFI_DRIVER_ATHEROS_MAIN = 'ath5k' # this driver applies to all other WiFi nodes (Atheros 5212 chipset)
+
+JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
 
 def send_command(needsJump, node, command, capture_response=False):
     if needsJump: 

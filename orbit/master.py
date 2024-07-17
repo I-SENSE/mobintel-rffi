@@ -26,14 +26,10 @@ TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
 TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe requests
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
-
 RX_CAP_LEN_UDP = "2" # For how many seconds should we capture UDP traffic
 RX_CAP_LEN_PROBES = "10" # For how many seconds should we capture Probe Request traffoc
-
 CONFIG_BATCH_SIZE = 5 # How many parallel config sessions should we run in parallel
-
 AWS_S3_BUCKET_NAME = 'mobintel-orbit-dataset'
-
 EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root experiment dir on local device
 # EXPERIMENT_DIR = '/home/smazokha2016/Desktop/orbit_experiment/' # Root experiment dir on CA-AI server
 
@@ -145,7 +141,7 @@ def run_capture_probes(tx_node_id, rx_node_ids, channel, ssid, interval, target_
 
     # Start transmission
     wifi_interface = tx_probe_master.node_emit_start(tx_node_id, channel, mac, ssid, interval)
-    time.sleep(5) # wait while the tmux session starts on TX device
+    time.sleep(5) # wait while the tmux session starts on TX device # TODO confirm this is enough time
 
     # Perform capture
     rx_files = run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir)
@@ -159,7 +155,7 @@ def run_capture_probes(tx_node_id, rx_node_ids, channel, ssid, interval, target_
 def run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, cap_len_sec):
     # Start transmission
     tx_udp_master.node_transmission_start(tx_node_id, ap_node_id)
-    time.sleep(5) # wait while the tmux session starts on TX device
+    time.sleep(5) # wait while the tmux session starts on TX device # TODO confirm this is enough time
 
     # Perform capture
     rx_files = run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir)
@@ -222,7 +218,7 @@ def run_full_experiment(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_nod
 
         if len(rx_files) < len(tx_node_ids_train) or None in rx_files:
             print("Some files are missing! Check the directory before moving forward")
-        rx_files_all.append(rx_files)
+        rx_files_all.extend(rx_files)
 
     if cloud_sync:
         print("Uploading training data to S3...")
@@ -248,7 +244,7 @@ def run_full_experiment(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_nod
                 
             if len(rx_files) < len(tx_node_ids_train) or None in rx_files:
                 print("Some files are missing! Check the directory before moving forward")
-            rx_files_all.append(rx_files)
+            rx_files_all.extend(rx_files)
 
         if cloud_sync:
             print("Uploading epoch data to S3...")

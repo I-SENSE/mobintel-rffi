@@ -5,12 +5,8 @@ from openai_client import OpenAIClient
 
 # Channel Number:   1         2         3         4         5         6         7         8         9         10        11        12        13
 OFDM_CENTER_FREQ = ["2412e6", "2417e6", "2422e6", "2427e6", "2432e6", "2437e6", "2442e6", "2447e6", "2452e6", "2457e6", "2462e6", "2467e6", "2472e6"]
-
-JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # grid.orbit-lab.org
-
 EXPERIMENT_DIR = "/Users/stepanmazokha/Desktop/orbit_dataset"
 CORE_RX_FILE = "/root/samples.dat"
-
 RX_CHANNEL_IDX = 11 # 1-based value, according to 802.11 standard
 RX_USRP_IP = "addr=192.168.10.2"
 RX_FREQ = OFDM_CENTER_FREQ[RX_CHANNEL_IDX - 1]
@@ -20,6 +16,8 @@ RX_SKIP = "1" # How many samples (N) do we skip, where N = RX_SKIP * RX_SAMP_RAT
 RX_CAP_LEN = "2" # For how long do we capture samples (in seconds)
 RX_LO_OFF = "0" # If the center freq is crowded, we can optionally tune it up (WiSig had it at 10 MHz)
 LLM_MAX_ATTEMPTS = 6 # How many times we'll use LLM to attempt node connection
+
+JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org"
 
 def generate_dir_name():
     return time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
@@ -131,7 +129,7 @@ def node_capture(tx_node_id, rx_node_id, target_dir, cap_len_sec):
     send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
     print(f'Capture completed for TX {tx_node_id}].')
 
-    return filename
+    return path_local
 
 def mode_rx(node_ids):
     if len(node_ids) == 0:

@@ -1,7 +1,7 @@
 import os
 import time
-import llm
 import subprocess
+from openai_client import OpenAIClient
 
 # Channel Number:   1         2         3         4         5         6         7         8         9         10        11        12        13
 OFDM_CENTER_FREQ = ["2412e6", "2417e6", "2422e6", "2427e6", "2432e6", "2437e6", "2442e6", "2447e6", "2452e6", "2457e6", "2462e6", "2467e6", "2472e6"]
@@ -58,6 +58,8 @@ def send_command(needsJump, node, command, capture_response=False):
     else: return None
 
 def node_configure(node_id):
+    openai_client = OpenAIClient()
+
     send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
@@ -69,7 +71,7 @@ def node_configure(node_id):
         
         attempts += 1
 
-        can_proceed = llm.prompt_is_ls_successful(send_command(True, node_id, "ls /root/", capture_response=True))
+        can_proceed = openai_client.prompt_is_ls_successful(send_command(True, node_id, "ls /root/", capture_response=True))
 
         if can_proceed:
             break
@@ -87,7 +89,7 @@ def node_configure(node_id):
     if stdout.__contains__('DATA2'):
         usrp_interface = 'DATA2'
     else:
-        usrp_interface = llm.prompt_find_usrp_interface(stdout)
+        usrp_interface = openai_client.prompt_find_usrp_interface(stdout)
 
     # if usrp_interface != 'NONE':
     send_command(True, node_id, f"ifconfig {usrp_interface} 192.168.10.1 netmask 255.255.255.0 up")

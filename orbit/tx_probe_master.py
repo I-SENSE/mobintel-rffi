@@ -1,9 +1,6 @@
-import os
 import time
 import subprocess
-import llm
-from multiprocessing import Process
-from collections import deque
+from openai_client import OpenAIClient
 
 JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting to the Grid
 
@@ -56,7 +53,7 @@ def node_configure(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
         
         attempts += 1
 
-        can_proceed = llm.prompt_is_ls_successful(send_command(True, node_id, "ls /root/", capture_response=True))
+        can_proceed = OpenAIClient().prompt_is_ls_successful(send_command(True, node_id, "ls /root/", capture_response=True))
 
         if can_proceed:
             break
@@ -83,7 +80,7 @@ def node_emit_start(node_id, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, inter
     if command_response.__contains__(TX_INTERFACE):
         interface = TX_INTERFACE
     else:
-        interface = llm.prompt_find_wifi_interface(command_response)
+        interface = OpenAIClient().prompt_find_wifi_interface(command_response)
         if interface == 'NONE':
             interface = input("Which interface should we use?")
         
@@ -105,7 +102,7 @@ def node_emit(node_id, channel=TX_CHANNEL, mac=TX_MAC, ssid=TX_SSID, interval=TX
     if command_response.__contains__(TX_INTERFACE):
         interface = TX_INTERFACE
     else:
-        interface = llm.prompt_find_wifi_interface(command_response)
+        interface = OpenAIClient().prompt_find_wifi_interface(command_response)
         if interface == 'NONE':
             interface = input("Which interface should we use?")
         

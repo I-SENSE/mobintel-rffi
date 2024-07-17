@@ -1,9 +1,6 @@
-import os
 import time
 import subprocess
-import llm
-from multiprocessing import Process
-from collections import deque
+from openai_client import OpenAIClient
 
 JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # grid.orbit-lab.org
 JUMP_NODE_OUTDOOR = "smazokha@outdoor.orbit-lab.org" # outdoor.orbit-lab.org
@@ -46,6 +43,8 @@ def send_command(jump, node, command, capture_response=False):
     else: return None
 
 def node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k, channel=TX_CHANNEL):
+    openai_client = OpenAIClient()
+
     send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a offh -t " + node_id)
     send_command(None, JUMP_NODE_OUTDOOR, "omf load -i baseline.ndz -t " + node_id)
     send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a on -t " + node_id)
@@ -57,7 +56,7 @@ def node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k, channel=TX_C
         
         attempts += 1
 
-        can_proceed = llm.prompt_is_ls_successful(send_command('outdoor', node_id, "ls /root/", capture_response=True))
+        can_proceed = openai_client.prompt_is_ls_successful(send_command('outdoor', node_id, "ls /root/", capture_response=True))
 
         if can_proceed:
             break
@@ -70,7 +69,7 @@ def node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k, channel=TX_C
     send_command('outdoor', node_id, "sudo apt-get install -y network-manager wireless-tools net-tools hostapd wireless-tools tmux rfkill socat")
     send_command('outdoor', node_id, f"modprobe {driver_name}")
 
-    interface = llm.prompt_find_wifi_interface(send_command('outdoor', node_id, "iwconfig", capture_response=True))
+    interface = openai_client.prompt_find_wifi_interface(send_command('outdoor', node_id, "iwconfig", capture_response=True))
     if interface == 'NONE':
         interface = input("Which interface should we use?")
 
@@ -128,6 +127,8 @@ EOF'
     print("AP setup complete.")
 
 def node_configure_tx(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k):
+    openai_client = OpenAIClient()
+
     send_command(None, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
     send_command(None, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(None, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
@@ -139,7 +140,7 @@ def node_configure_tx(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k):
         
         attempts += 1
 
-        can_proceed = llm.prompt_is_ls_successful(send_command('grid', node_id, "ls /root/", capture_response=True))
+        can_proceed = openai_client.prompt_is_ls_successful(send_command('grid', node_id, "ls /root/", capture_response=True))
 
         if can_proceed:
             break
@@ -152,7 +153,7 @@ def node_configure_tx(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k):
     send_command('grid', node_id, "sudo apt-get -y install net-tools network-manager hostapd wireless-tools rfkill tmux socat")
     send_command('grid', node_id, f"modprobe {driver_name}")
 
-    interface = llm.prompt_find_wifi_interface(send_command('grid', node_id, "iwconfig", capture_response=True))
+    interface = openai_client.prompt_find_wifi_interface(send_command('grid', node_id, "iwconfig", capture_response=True))
 
     if interface == 'NONE':
         interface = input("Which interface should we use?")

@@ -8,8 +8,7 @@ OFDM_CENTER_FREQ = ["2412e6", "2417e6", "2422e6", "2427e6", "2432e6", "2437e6", 
 
 JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # grid.orbit-lab.org
 
-CORE_LOCAL_FOLDER = "/Users/stepanmazokha/Desktop/"
-CORE_LOCAL_DATASET_NAME = "orbit_dataset"
+EXPERIMENT_DIR = "/Users/stepanmazokha/Desktop/orbit_dataset"
 CORE_RX_FILE = "/root/samples.dat"
 
 RX_CHANNEL_IDX = 11 # 1-based value, according to 802.11 standard
@@ -114,7 +113,7 @@ def node_configure(node_id):
 
     print(f'RX node {node_id} configured.')
 
-def node_capture(tx_node_id, rx_node_id, local_dir, cap_len_sec):
+def node_capture(tx_node_id, rx_node_id, target_dir, cap_len_sec):
     # 0. Remove any residual files, if any
     send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
 
@@ -123,7 +122,7 @@ def node_capture(tx_node_id, rx_node_id, local_dir, cap_len_sec):
 
     # 2. Download file to local device
     filename = f"tx{{node_{tx_node_id}}}_rx{{node_{rx_node_id}+rxFreq_{RX_FREQ}+rxGain_{RX_GAIN}+capLen_{cap_len_sec}+rxSampRate_{RX_SAMP_RATE}}}.dat"
-    path_local = os.path.join(local_dir, filename)
+    path_local = os.path.join(target_dir, filename)
     command = f"scp -J {JUMP_NODE_GRID} root@{rx_node_id}:{CORE_RX_FILE} {path_local}"
     print(command)
     os.system(command)
@@ -132,24 +131,22 @@ def node_capture(tx_node_id, rx_node_id, local_dir, cap_len_sec):
     send_command(True, rx_node_id, f"rm -rf {CORE_RX_FILE}")
     print(f'Capture completed for TX {tx_node_id}].')
 
+    return filename
+
 def mode_rx(node_ids):
-    experiment_dir = input("We'll store data on the desktop. What should be the folder name?")
-
-    if experiment_dir == "": experiment_dir = CORE_LOCAL_DATASET_NAME
-    experiment_dir = os.path.join(CORE_LOCAL_FOLDER, experiment_dir)
-
-    if not os.path.exists(experiment_dir):
-        print("Root folder doesn't exist. We'll create it.")
-        os.mkdir(experiment_dir)
-
-    target_folder = prepare_target_dir(experiment_dir, 'epoch_')
-    os.mkdir(target_folder)
-
-    print("OK, we'll work here: " + target_folder)
-
     if len(node_ids) == 0:
         print('No nodes to emit from.')
         return
+
+    # Ensure that the dir for the experiment is correct
+    input(f"Experiment dir: {EXPERIMENT_DIR}. OK?")
+    experiment_dir = EXPERIMENT_DIR
+    os.makedirs(experiment_dir, exist_ok=True)
+
+    # Generate & create directory for the RX epoch
+    target_folder = prepare_target_dir(experiment_dir, 'epoch_')
+    os.mkdir(target_folder)
+    print(f"Will store files here: {target_folder}")
     
     tx_node_id = input("TX node ID: ")
 

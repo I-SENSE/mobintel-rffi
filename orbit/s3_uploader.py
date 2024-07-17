@@ -8,8 +8,6 @@ from threading import Lock
 
 load_dotenv()
 
-AWS_S3_BUCKET_NAME = 'mobintel-orbit-dataset'
-
 class S3Uploader:
     _instance = None
     _lock = Lock()

@@ -12,6 +12,7 @@ import random
 import numpy as np
 import queue
 import time
+from s3_uploader import S3Uploader
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 AP_NODE = "node2-5"
@@ -31,7 +32,10 @@ RX_CAP_LEN_PROBES = "10" # For how many seconds should we capture Probe Request 
 
 CONFIG_BATCH_SIZE = 5 # How many parallel config sessions should we run in parallel
 
-EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root dir for our experiment
+AWS_S3_BUCKET_NAME = 'mobintel-orbit-dataset'
+
+EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root experiment dir on local device
+# EXPERIMENT_DIR = '/home/smazokha2016/Desktop/orbit_experiment/' # Root experiment dir on CA-AI server
 
 # Generates a 'virtual' MAC address (first 3 octets are the same, the remaining are randomized)
 def generate_virtual_mac():
@@ -52,11 +56,14 @@ def command_rx(tx_node_id, rx_node_id, cap_len_sec, target_dir, start_event):
 
         print(f"RX: {tx_node_id} -> {rx_node_id}: Running...")
 
-        rx_master.node_capture(tx_node_id, rx_node_id, target_dir, cap_len_sec)
+        rx_file = rx_master.node_capture(tx_node_id, rx_node_id, target_dir, cap_len_sec)
 
         print(f"RX: {tx_node_id} -> {rx_node_id}: Completed.")
+
+        return rx_file
     except Exception as e:
         print(f"Something went wrong: {str(e)}")
+        return None
 
 # Performs configuration of a given device:
 # - node_id: identifier of the configured node (format: X-Y)
@@ -111,93 +118,150 @@ def run_config(tx_node_ids, rx_node_ids, ap_node_ids, tx_mode, batch_size, tx_ch
 # - rx_node_ids: identifiers of the RX nodes that are capturing signal
 # - tx_node_id: identifier of the TX node that emits signal (for file naming only)
 # - target_dir: directory where we'll save the file with IQ samples
+# - the function returns the list of file names which were produced in the target_dir
 def run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir):
     start_event = threading.Event()
+    rx_files = []
 
     # 1. Configure and start all threads
-    threads = []
-    for rx_node_id in rx_node_ids:
-        thread = threading.Thread(target=command_rx, args=(tx_node_id, rx_node_id, cap_len_sec, target_dir, start_event))
-        thread.start()
-        threads.append(thread)
+    with ThreadPoolExecutor(max_workers=len(rx_node_ids)) as executor:
+        futures = []
+        for rx_node_id in rx_node_ids:
+            future = executor.submit(command_rx, tx_node_id, rx_node_id, cap_len_sec, target_dir, start_event)
+            futures.append(future)
 
-    # 2. Launch signal capture on all threads simultaneously
-    start_event.set()
+        # 2. Launch signal capture on all threads simultaneously
+        start_event.set()
 
-    # 3. Wait for the threads to finish
-    for thread in threads:
-        thread.join()
+        # 3. Collect the results as the threads complete
+        for future in as_completed(futures):
+            rx_files.append(future.result())
 
-# Runs a single transmission task, probe request mode
-def run_capture_probes(tx_node_id, rx_node_ids, channel, mac, ssid, interval, target_dir, cap_len_sec):
+    return rx_files
+
+# Runs a single transmission task, probe request mode, store on a local device
+def run_capture_probes(tx_node_id, rx_node_ids, channel, ssid, interval, target_dir, cap_len_sec):
+    mac = generate_virtual_mac() # produce a randomized (aka 'virtual') MAC address, unqiue for each epoch/device
+
     # Start transmission
     wifi_interface = tx_probe_master.node_emit_start(tx_node_id, channel, mac, ssid, interval)
     time.sleep(5) # wait while the tmux session starts on TX device
 
     # Perform capture
-    run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir)
+    rx_files = run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir)
 
     # Stop transmission
     tx_probe_master.node_emit_stop(tx_node_id, wifi_interface)
 
-# Runs a single transmission task, udp mode
+    return rx_files
+
+# Runs a single transmission task, udp mode, store on a local device
 def run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, cap_len_sec):
     # Start transmission
     tx_udp_master.node_transmission_start(tx_node_id, ap_node_id)
     time.sleep(5) # wait while the tmux session starts on TX device
 
     # Perform capture
-    run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir)
+    rx_files = run_rx(tx_node_id, rx_node_ids, cap_len_sec, target_dir)
 
     # Stop transmission
     tx_udp_master.node_transmission_stop(tx_node_id, ap_node_id)
 
-# Runs a full experiment in udp mode
-def run_full_experiment_udp(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_node_id, experiment_dir, cap_len_sec, epochs):
-    # 1. Perform data capture for the training devices
-    print(f"Running training capture [udp]")
-    target_dir = rx_master.prepare_target_dir(experiment_dir, 'training_')
-    os.mkdir(target_dir)
-    for tx_node_id in tx_node_ids_train:
-        run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, cap_len_sec)
+    return rx_files
 
+# Uploads produced sample data to S3
+# - bucket_name: name of the S3 bucket
+# - experiment_dir: path to the local experiment folder
+# - epoch_name: name of the RX session (training or testing epoch)
+# - rx_files: list of full paths to .dat files to upload
+#
+# S3 path to each file looks like this:
+#     {experiment_name}/{epoch_name}/{rx_file.dat}
+#
+#     Note: no '/' at the beginning!
+#     Note: if there are files with the same "key" in AWS -- they will be overwritten
+def upload_samples(bucket_name, experiment_dir, target_dir, rx_files):
+    experiment_name = os.path.basename(experiment_dir.rstrip('/'))
+    epoch_name = os.path.basename(target_dir.rstrip('/'))
+
+    s3_file_paths = []
+    for local_path in rx_files:
+        local_filename = os.path.basename(local_path)
+        s3_filename = f"{experiment_name}/{epoch_name}/{local_filename}"
+        s3_file_paths.append(s3_filename)
+
+    S3Uploader().upload_files_to_s3(bucket_name, rx_files, s3_file_paths)
+
+# Deletes local samples
+def delete_local_samples(rx_files):
+    for rx_file in rx_files:
+        try:
+            if os.path.isfile(rx_file):
+                os.remove(rx_file)
+                print(f"Deleted {rx_file}")
+        except Exception as e:
+            print(f"Failed to delete {rx_file}. Reason: {e}")
+
+# Runs a full experiment
+# - tx_node: [probe | udp]
+def run_full_experiment(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_node_id, experiment_dir, epochs, tx_mode, cloud_sync=True, s3_bucket_name=AWS_S3_BUCKET_NAME):
+    input("Ready to start capturing training data?")
+
+    # 1. Perform data capture for the training devices
+    print(f"Running training capture")
+    
+    target_dir = rx_master.prepare_target_dir(experiment_dir, 'training_')
+    os.makedirs(target_dir, exist_ok=True)
+
+    rx_files_all = []
+    for tx_node_id in tx_node_ids_train:
+        if tx_mode == 'udp':
+            rx_files = run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, RX_CAP_LEN_UDP)
+        else: 
+            rx_files = run_capture_probes(tx_node_id, rx_node_ids, TX_CHANNEL, TX_SSID, TX_INTERVAL, target_dir, RX_CAP_LEN_PROBES)
+
+        if len(rx_files) < len(tx_node_ids_train) or None in rx_files:
+            print("Some files are missing! Check the directory before moving forward")
+        rx_files_all.append(rx_files)
+
+    if cloud_sync:
+        print("Uploading training data to S3...")
+        upload_samples(s3_bucket_name, experiment_dir, target_dir, rx_files_all)
+        delete_local_samples(rx_files_all)
+
+    input("Ready to start capturing epochs?")
     print("================ TRAINING CAPTURE COMPLETE ================")
 
     # 2. Run testing data capture for a given number of epochs
     for epoch_i in np.arange(epochs):
-        print(f"Running epoch #{epoch_i + 1} [udp]")
+        print(f"Running epoch #{epoch_i + 1}")
+
+        rx_files_all = [] # resetting the list of RX file paths
 
         target_dir = rx_master.prepare_target_dir(experiment_dir, 'epoch_')
-        os.mkdir(target_dir)
+        os.makedirs(target_dir, exist_ok=True)
         for tx_node_id in tx_node_ids_test:
-            run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, cap_len_sec)
+            if tx_mode == 'udp':
+                rx_files = run_capture_udp(tx_node_id, ap_node_id, rx_node_ids, target_dir, RX_CAP_LEN_UDP)
+            else: # "probe"
+                rx_files = run_capture_probes(tx_node_id, rx_node_ids, TX_CHANNEL, TX_SSID, TX_INTERVAL, target_dir, RX_CAP_LEN_PROBES)
+                
+            if len(rx_files) < len(tx_node_ids_train) or None in rx_files:
+                print("Some files are missing! Check the directory before moving forward")
+            rx_files_all.append(rx_files)
 
-        print(f"================ EPOCH #{epoch_i + 1} CAPTURE COMPLETE ================")
-
-# Runs a full experiment in probe mode
-def run_full_experiment_probe(tx_node_ids_train, tx_node_ids_test, rx_node_ids, experiment_dir, channel, ssid, interval, cap_len_sec, epochs):
-    # 1. Perform data capture for the training devices
-    print(f"Running training capture [probes]")
-    target_dir = rx_master.prepare_target_dir(experiment_dir, 'training_')
-    os.mkdir(target_dir)
-    for tx_node_id in tx_node_ids_train:
-        mac = generate_virtual_mac() # produce a randomized (aka 'virtual') MAC address, unqiue for each epoch/device
-        run_capture_probes(tx_node_id, rx_node_ids, channel, mac, ssid, interval, target_dir, cap_len_sec)
-
-    print("================ TRAINING CAPTURE COMPLETE ================")
-
-    # 2. Run testing data capture for a given number of epochs
-    for epoch_i in np.arange(epochs):
-        print(f"Running epoch #{epoch_i + 1} [probes]")
-
-        target_dir = rx_master.prepare_target_dir(experiment_dir, 'epoch_')
-        os.mkdir(target_dir)
-        for tx_node_id in tx_node_ids_test:
-            run_capture_probes(tx_node_id, rx_node_ids, channel, mac, ssid, interval, target_dir, cap_len_sec)
-
+        if cloud_sync:
+            print("Uploading epoch data to S3...")
+            upload_samples(s3_bucket_name, experiment_dir, target_dir, rx_files_all)
+            delete_local_samples(rx_files_all)
+            
         print(f"================ EPOCH #{epoch_i + 1} CAPTURE COMPLETE ================")
 
 def main():
+    # Ensure that the dir for the experiment is correct
+    input(f"Experiment dir: {EXPERIMENT_DIR}. OK?")
+    os.makedirs(EXPERIMENT_DIR, exist_ok=True)
+
     while True:
         instruction = input("What should we do? [config [probe | udp] | emit [probe | udp]] | run experiment [probe | udp]")
 
@@ -208,26 +272,22 @@ def main():
         elif instruction == 'emit probe':
             tx_node_id = input('TX node ID: ') # 'node14-7'
             target_dir = rx_master.prepare_target_dir(EXPERIMENT_DIR, '')
-
-            if not os.path.exists(target_dir): os.mkdir(target_dir)
-
+            os.makedirs(target_dir, exist_ok=True)
             run_capture_probes(tx_node_id, RX_NODES, TX_CHANNEL, TX_MAC, TX_SSID, TX_SSID, target_dir)
-
         elif instruction == 'emit udp':
             tx_node_id = input('TX node ID: ') # 'node14-7'
             ap_node_id = input('AP node ID: ') # AP_NODE
             target_dir = rx_master.prepare_target_dir(EXPERIMENT_DIR, '')
-
-            if not os.path.exists(target_dir): os.mkdir(target_dir)
-
+            os.makedirs(target_dir, exist_ok=True)
             run_capture_udp(tx_node_id, ap_node_id, RX_NODES, target_dir)
-
         elif instruction == 'run experiment probe':
             epochs = int(input('How many epochs? (int only please): '))
-            run_full_experiment_probe(TX_TRAINING_NODES, TX_TESTING_NODES, RX_NODES, EXPERIMENT_DIR, TX_CHANNEL, TX_SSID, TX_INTERVAL, RX_CAP_LEN_PROBES, epochs)
+            cloud_sync = input('Should we record to AWS S3? [Y by default | n]') != 'n'
+            run_full_experiment(TX_TRAINING_NODES, TX_TESTING_NODES, RX_NODES, AP_NODE, EXPERIMENT_DIR, epochs, 'probe', cloud_sync)
         elif instruction == 'run experiment udp':
             epochs = int(input('How many epochs? (int only please): '))
-            run_full_experiment_udp(TX_TRAINING_NODES, TX_TESTING_NODES, RX_NODES, AP_NODE, EXPERIMENT_DIR, RX_CAP_LEN_UDP, epochs)
+            cloud_sync = input('Should we record to AWS S3? [Y by default | n]') != 'n'
+            run_full_experiment(TX_TRAINING_NODES, TX_TESTING_NODES, RX_NODES, AP_NODE, EXPERIMENT_DIR, epochs, 'udp', cloud_sync)
         else: print('Invalid command.')
 
 if __name__ == "__main__":

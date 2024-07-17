@@ -22,7 +22,7 @@ def send_command(jump, node, command, capture_response=False):
     else:
         return
 
-    print(cmd)
+    print(f"[{node}] {cmd}")
 
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     
@@ -35,7 +35,7 @@ def send_command(jump, node, command, capture_response=False):
             break
 
         if stdout_line:
-            print(stdout_line, end='')
+            print(f"[{node}] {stdout_line}", end='')
             if capture_response:
                 stdout_lines.append(stdout_line)
         

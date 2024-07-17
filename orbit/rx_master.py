@@ -34,7 +34,7 @@ def send_command(needsJump, node, command, capture_response=False):
     else: 
         cmd = "ssh %s \"%s\"" % (node, command)
 
-    print(cmd)
+    print(f"[{node}] {cmd}")
     
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     
@@ -47,7 +47,7 @@ def send_command(needsJump, node, command, capture_response=False):
             break
 
         if stdout_line:
-            print(stdout_line, end='')
+            print(f"[{node}] {stdout_line}", end='')
             if capture_response:
                 stdout_lines.append(stdout_line)
         
@@ -84,20 +84,22 @@ def node_configure(node_id):
     send_command(True, node_id, "rfkill block wlan")
 
     stdout = send_command(True, node_id, "ifconfig", capture_response=True)
-
-    usrp_interface = llm.prompt_find_usrp_interface(stdout)
-
-    if usrp_interface != 'NONE':
-        send_command(True, node_id, f"ifconfig {usrp_interface} 192.168.10.1 netmask 255.255.255.0 up")
+    if stdout.__contains__('DATA2'):
+        usrp_interface = 'DATA2'
     else:
-        while True:
-            interface = input("Which interface should we use?")
-            send_command(True, node_id, f"ifconfig {interface} 192.168.10.1 netmask 255.255.255.0 up")
-            send_command(True, node_id, "uhd_find_devices")
+        usrp_interface = llm.prompt_find_usrp_interface(stdout)
 
-            instruction = input("Did it work? [Y/any key]")
-            if instruction == 'Y': break
-            else: continue
+    # if usrp_interface != 'NONE':
+    send_command(True, node_id, f"ifconfig {usrp_interface} 192.168.10.1 netmask 255.255.255.0 up")
+    # else:
+    #     while True:
+    #         interface = input("Which interface should we use?")
+    #         send_command(True, node_id, f"ifconfig {interface} 192.168.10.1 netmask 255.255.255.0 up")
+    #         send_command(True, node_id, "uhd_find_devices")
+
+    #         instruction = input("Did it work? [Y/any key]")
+    #         if instruction == 'Y': break
+    #         else: continue
 
     send_command(True, node_id, f'/usr/lib/uhd/examples/test_pps_input --args=\"{RX_USRP_IP}\" --source external')
 

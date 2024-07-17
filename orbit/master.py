@@ -9,12 +9,13 @@ import tx_probe_master
 import rx_master
 import threading
 import random
+import numpy as np
 import queue
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 AP_NODE = "node2-5"
-RX_NODES = ["node1-1", "node1-20", "node20-1", "node20-20"]
+RX_NODES = ["node1-1", "node1-20", "node20-1", "node19-19"]
 TX_TRAINING_NODES = ['node5-1', 'node7-10', 'node7-14', 'node2-19', 'node5-5', 'node19-1', 'node20-20', 'node1-10', 'node8-20', 'node11-17', 
                      'node2-6', 'node1-12', 'node4-1', 'node3-13', 'node1-16', 'node8-8', 'node8-18', 'node1-19', 'node1-18', 'node11-7', 
                      'node20-12', 'node4-10', 'node11-4', 'node8-3', 'node4-11', 'node3-18', 'node14-7', 'node10-17', 'node10-11']
@@ -66,9 +67,9 @@ def command_config(node_id, node_type, channel):
         if node_type == 'AP': # only relevant in case we're sending UDP traffic
             tx_udp_master.node_configure_ap(node_id, driver_name=tx_udp_master.WIFI_DRIVER_ATHEROS_10k, channel=channel)
         elif node_type == 'TX-probe':
-            tx_probe_master.node_configure(node_id, driver_name=tx_probe_master.WIFI_DRIVER_ATHEROS_MAIN, channel=channel)
+            tx_probe_master.node_configure(node_id, driver_name=tx_probe_master.WIFI_DRIVER_ATHEROS_MAIN)
         elif node_type == 'TX-udp':
-            tx_udp_master.node_configure_tx(node_id, driver_name=tx_udp_master.WIFI_DRIVER_ATHEROS_MAIN, channel=channel)
+            tx_udp_master.node_configure_tx(node_id, driver_name=tx_udp_master.WIFI_DRIVER_ATHEROS_MAIN)
         elif node_type == 'RX':
             rx_master.node_configure(node_id)
         else: 
@@ -163,7 +164,7 @@ def run_full_experiment_udp(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap
     print("================ TRAINING CAPTURE COMPLETE ================")
 
     # 2. Run testing data capture for a given number of epochs
-    for epoch_i in epochs:
+    for epoch_i in np.arange(epochs):
         print(f"Running epoch #{epoch_i + 1} [udp]")
 
         target_dir = rx_master.prepare_target_dir(experiment_dir, 'epoch_')
@@ -186,7 +187,7 @@ def run_full_experiment_probe(tx_node_ids_train, tx_node_ids_test, rx_node_ids, 
     print("================ TRAINING CAPTURE COMPLETE ================")
 
     # 2. Run testing data capture for a given number of epochs
-    for epoch_i in epochs:
+    for epoch_i in np.arange(epochs):
         print(f"Running epoch #{epoch_i + 1} [probes]")
 
         target_dir = rx_master.prepare_target_dir(experiment_dir, 'epoch_')

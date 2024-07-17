@@ -20,14 +20,18 @@ close all; clear; clc;
 % main_detect_frames('node1-1', filename_silent, [DIR_IN 'training_2024-07-13_06-53-20/'], [DIR_OUT 'training_2024-07-13_06-53-20/'])
 % main_detect_frames('node1-1', filename_silent, [DIR_IN 'epoch_2024-07-13_07-40-21/'], [DIR_OUT 'epoch_2024-07-13_07-40-21/'])
 
-DIR_IN = '/Users/stepanmazokha/Desktop/orbit_dataset/';
+% DIR_IN = '/Users/stepanmazokha/Desktop/orbit_dataset/';
 
-plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-34-07', 'udp-2sec'));
-% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-53-51', 'silent-5sec'));
-% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-56-20', 'probes'));
-% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-07-02', 'probes'));
-plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-11-47', 'silent'));
-plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-19-38', 'probes'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_05-34-07', 'udp-2sec'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-11-47', 'silent'));
+% plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-16_06-19-38', 'probes'));
+
+DIR_IN = '/Users/stepanmazokha/Desktop/orbit_experiment/';
+
+plot_iq(get_file_path(DIR_IN, 'training_2024-07-17_06-45-48', 'tx{node_node5-1}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
+plot_iq(get_file_path(DIR_IN, 'training_2024-07-17_06-45-48', 'tx{node_node5-1}_rx{node_node1-20+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
+plot_iq(get_file_path(DIR_IN, 'training_2024-07-17_06-45-48', 'tx{node_node5-1}_rx{node_node19-19+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
+plot_iq(get_file_path(DIR_IN, 'training_2024-07-17_06-45-48', 'tx{node_node5-1}_rx{node_node20-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
 
 % plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-13_08-38-59', 'tx{node_node20-15}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));
 % plot_iq(get_file_path(DIR_IN, 'epoch_2024-07-13_08-51-04', 'tx{node_node20-19}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}'));

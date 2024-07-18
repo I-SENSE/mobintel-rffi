@@ -12,11 +12,11 @@ JUMP_NODE_OUTDOOR = "smazokha@outdoor.orbit-lab.org" # outdoor.orbit-lab.org
 
 def send_command(jump, node, command, capture_response=False):
     if jump == None:
-        cmd = "ssh %s \"%s\"" % (node, command)
+        cmd = "ssh -o StrictHostKeyChecking=no %s \"%s\"" % (node, command)
     elif jump == 'grid':
-        cmd = "ssh -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
+        cmd = "ssh -o StrictHostKeyChecking=no -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
     elif jump == 'outdoor':
-        cmd = "ssh -J %s root@%s \"%s\"" % (JUMP_NODE_OUTDOOR, node, command)
+        cmd = "ssh -o StrictHostKeyChecking=no -J %s root@%s \"%s\"" % (JUMP_NODE_OUTDOOR, node, command)
     else:
         return
 
@@ -47,7 +47,7 @@ def node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k, channel=TX_C
     openai_client = OpenAIClient()
 
     send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a offh -t " + node_id)
-    send_command(None, JUMP_NODE_OUTDOOR, "omf load -i baseline.ndz -t " + node_id)
+    send_command(None, JUMP_NODE_OUTDOOR, "omf load -i baseline-5.4.1.ndz -t " + node_id)
     send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a on -t " + node_id)
 
     attempts = 0
@@ -66,8 +66,9 @@ def node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k, channel=TX_C
             print("This was the last attempt. Node is dead. Quitting.")
             return
 
+    send_command('outdoor', node_id, "sudo apt update -y")
     send_command('outdoor', node_id, "sudo apt-get update -y")
-    send_command('outdoor', node_id, "sudo apt-get install -y network-manager wireless-tools net-tools hostapd wireless-tools tmux rfkill socat")
+    send_command('outdoor', node_id, "sudo apt-get install -y network-manager wireless-tools net-tools hostapd tmux rfkill socat")
     send_command('outdoor', node_id, f"modprobe {driver_name}")
 
     interface = openai_client.prompt_find_wifi_interface(send_command('outdoor', node_id, "iwconfig", capture_response=True))
@@ -127,11 +128,11 @@ EOF'
 
     print("AP setup complete.")
 
-def node_configure_tx(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k):
+def node_configure_tx(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
     openai_client = OpenAIClient()
 
     send_command(None, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
-    send_command(None, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
+    send_command(None, JUMP_NODE_GRID, "omf load -i baseline-5.4.1.ndz -t " + node_id)
     send_command(None, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
 
     attempts = 0
@@ -150,6 +151,7 @@ def node_configure_tx(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k):
             print("This was the last attempt. Node is dead. Quitting.")
             return
 
+    send_command('grid', node_id, "sudo apt update -y")
     send_command('grid', node_id, "sudo apt-get -y update")
     send_command('grid', node_id, "sudo apt-get -y install net-tools network-manager hostapd wireless-tools rfkill tmux socat")
     send_command('grid', node_id, f"modprobe {driver_name}")

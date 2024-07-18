@@ -14,9 +14,9 @@ JUMP_NODE_GRID = "smazokha@grid.orbit-lab.org" # Node via which we're connecting
 
 def send_command(needsJump, node, command, capture_response=False):
     if needsJump: 
-        cmd = "ssh -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
+        cmd = "ssh -o StrictHostKeyChecking=no -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
     else: 
-        cmd = "ssh %s \"%s\"" % (node, command)
+        cmd = "ssh -o StrictHostKeyChecking=no %s \"%s\"" % (node, command)
 
     print(f"[{node}] {cmd}")
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -42,7 +42,7 @@ def send_command(needsJump, node, command, capture_response=False):
 
 def node_configure(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
     send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
-    send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf load -i baseline-5.4.1.ndz -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
 
     attempts = 0
@@ -61,6 +61,7 @@ def node_configure(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
             print("This was the last attempt. Node is dead. Quitting.")
             return
 
+    send_command(True, node_id, "sudo apt update -y")
     send_command(True, node_id, "sudo apt-get -y update")
     send_command(True, node_id, "sudo apt-get -y install network-manager net-tools hostapd wireless-tools tmux python3-pip aircrack-ng git")
     send_command(True, node_id, "pip3 install scapy")

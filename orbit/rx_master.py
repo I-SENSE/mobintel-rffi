@@ -27,9 +27,9 @@ def prepare_target_dir(experiment_dir, prefix):
 
 def send_command(needsJump, node, command, capture_response=False):
     if needsJump: 
-        cmd = "ssh -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
+        cmd = "ssh -o StrictHostKeyChecking=no -J %s root@%s \"%s\"" % (JUMP_NODE_GRID, node, command)
     else: 
-        cmd = "ssh %s \"%s\"" % (node, command)
+        cmd = "ssh -o StrictHostKeyChecking=no %s \"%s\"" % (node, command)
 
     print(f"[{node}] {cmd}")
     
@@ -58,7 +58,7 @@ def node_configure(node_id):
     openai_client = OpenAIClient()
 
     send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
-    send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf load -i baseline-5.4.1.ndz -t " + node_id)
     send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
 
     attempts = 0
@@ -78,6 +78,7 @@ def node_configure(node_id):
             return
 
     send_command(True, node_id, "sudo add-apt-repository ppa:gnuradio/gnuradio-releases")
+    send_command(True, node_id, "sudo apt update -y")
     send_command(True, node_id, "sudo apt-get update -y")
     send_command(True, node_id, "sudo apt-get install -y uhd-host net-tools wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0 rfkill")
     send_command(True, node_id, "rfkill block wlan")
@@ -121,7 +122,7 @@ def node_capture(tx_node_id, rx_node_id, target_dir, cap_len_sec):
     # 2. Download file to local device
     filename = f"tx{{node_{tx_node_id}}}_rx{{node_{rx_node_id}+rxFreq_{RX_FREQ}+rxGain_{RX_GAIN}+capLen_{cap_len_sec}+rxSampRate_{RX_SAMP_RATE}}}.dat"
     path_local = os.path.join(target_dir, filename)
-    command = f"scp -J {JUMP_NODE_GRID} root@{rx_node_id}:{CORE_RX_FILE} {path_local}"
+    command = f"scp -o StrictHostKeyChecking=no -J {JUMP_NODE_GRID} root@{rx_node_id}:{CORE_RX_FILE} {path_local}"
     print(command)
     os.system(command)
 

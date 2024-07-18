@@ -28,10 +28,10 @@ TX_MAC = "11:22:33:44:55:66" # Spoofed MAC address we'll use in our probe reques
 TX_CHANNEL = 11 # Channel ID on which we'll be sending our probes [1 -- 13]
 RX_CAP_LEN_UDP = "2" # For how many seconds should we capture UDP traffic
 RX_CAP_LEN_PROBES = "10" # For how many seconds should we capture Probe Request traffoc
-CONFIG_BATCH_SIZE = 5 # How many parallel config sessions should we run in parallel
+CONFIG_BATCH_SIZE = 2 # How many parallel config sessions should we run in parallel
 AWS_S3_BUCKET_NAME = 'mobintel-orbit-dataset'
-EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root experiment dir on local device
-# EXPERIMENT_DIR = '/home/smazokha2016/Desktop/orbit_experiment/' # Root experiment dir on CA-AI server
+# EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root experiment dir on local device
+EXPERIMENT_DIR = '/home/smazokha2016/Desktop/orbit_experiment/' # Root experiment dir on CA-AI server
 
 # Generates a 'virtual' MAC address (first 3 octets are the same, the remaining are randomized)
 def generate_virtual_mac():

@@ -20,7 +20,7 @@ RX_NODES = ["node1-1", "node1-20", "node20-1", "node19-19"]
 TX_TRAINING_NODES = ['node5-1', 'node7-10', 'node7-14', 'node2-19', 'node5-5', 'node19-1', 'node20-20', 'node1-10', 'node8-20', 'node11-17', 
                      'node2-6', 'node1-12', 'node4-1', 'node3-13', 'node1-16', 'node8-8', 'node8-18', 'node1-19', 'node1-18', 'node11-7', 
                      'node20-12', 'node4-10', 'node11-4', 'node8-3', 'node4-11', 'node3-18', 'node14-7', 'node10-17', 'node10-11']
-TX_TESTING_NODES = ['node12-20', 'node17-11', 'node20-19', 'node20-1', 'node20-15', 'node14-10', 'node16-16', 'node15-1', 'node16-1'] # TODO: pick 15th node!!!!!!!
+TX_TESTING_NODES = ['node12-20', 'node17-11', 'node20-19', 'node20-15', 'node14-10', 'node16-16', 'node15-1', 'node16-1'] # TODO: pick 14th, 15th node!!!!!!!
 
 TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
@@ -203,11 +203,11 @@ def delete_local_samples(rx_files):
 def run_full_experiment(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_node_id, experiment_dir, epochs, tx_mode, cloud_sync=True, s3_bucket_name=AWS_S3_BUCKET_NAME):
     input("Ready to start capturing training data?")
 
-    # 1. Perform data capture for the training devices
-    print(f"Running training capture")
-    
     target_dir = rx_master.prepare_target_dir(experiment_dir, 'training_')
     os.makedirs(target_dir, exist_ok=True)
+
+    # 1. Perform data capture for the training devices
+    print(f"Running training capture")
 
     rx_files_all = []
     for tx_node_id in tx_node_ids_train:
@@ -216,7 +216,7 @@ def run_full_experiment(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_nod
         else: 
             rx_files = run_capture_probes(tx_node_id, rx_node_ids, TX_CHANNEL, TX_SSID, TX_INTERVAL, target_dir, RX_CAP_LEN_PROBES)
 
-        if len(rx_files) < len(tx_node_ids_train) or None in rx_files:
+        if len(rx_files) < len(rx_node_ids) or None in rx_files:
             print("Some files are missing! Check the directory before moving forward")
         rx_files_all.extend(rx_files)
 
@@ -242,7 +242,7 @@ def run_full_experiment(tx_node_ids_train, tx_node_ids_test, rx_node_ids, ap_nod
             else: # "probe"
                 rx_files = run_capture_probes(tx_node_id, rx_node_ids, TX_CHANNEL, TX_SSID, TX_INTERVAL, target_dir, RX_CAP_LEN_PROBES)
                 
-            if len(rx_files) < len(tx_node_ids_train) or None in rx_files:
+            if len(rx_files) < len(rx_node_ids) or None in rx_files:
                 print("Some files are missing! Check the directory before moving forward")
             rx_files_all.extend(rx_files)
 

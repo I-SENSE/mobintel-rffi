@@ -8,6 +8,8 @@ from threading import Lock
 
 load_dotenv()
 
+MAX_UPLOAD_WORKERS = 5 # how many files can we upload to S3 concurrently
+
 class S3Uploader:
     _instance = None
     _lock = Lock()
@@ -59,7 +61,7 @@ class S3Uploader:
     def upload_files_to_s3(self, bucket_name, local_file_paths, s3_file_paths):
         num_files = len(local_file_paths)
         with tqdm(total=num_files, desc='Overall Progress', position=0, leave=True) as overall_progress:
-            with ThreadPoolExecutor(max_workers=num_files) as executor:
+            with ThreadPoolExecutor(max_workers=MAX_UPLOAD_WORKERS) as executor:
                 futures = []
                 for idx, (local_file_path, s3_file_path) in enumerate(zip(local_file_paths, s3_file_paths)):
                     futures.append(executor.submit(self.upload_file_to_s3, bucket_name, local_file_path, s3_file_path, idx + 1))

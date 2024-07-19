@@ -54,30 +54,33 @@ def send_command(needsJump, node, command, capture_response=False):
         return ''.join(stdout_lines)
     else: return None
 
-def node_configure(node_id):
-    openai_client = OpenAIClient()
-
-    send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
-    send_command(False, JUMP_NODE_GRID, "omf load -i baseline-5.4.1.ndz -t " + node_id)
-    send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
-
+def node_ready_wait(node_id, wait_seconds=30):
     attempts = 0
     while attempts < LLM_MAX_ATTEMPTS:
-        print('Sleeping for 30 seconds before attempting to connect.')
-        time.sleep(30)
+        print(f'Sleeping for {wait_seconds} seconds before attempting to connect.')
+        time.sleep(wait_seconds)
         
         attempts += 1
 
-        can_proceed = openai_client.prompt_is_ls_successful(send_command(True, node_id, "ls /root/", capture_response=True))
+        can_proceed = OpenAIClient().prompt_is_ls_successful(send_command(True, node_id, "ls /root/", capture_response=True))
 
         if can_proceed:
             break
         
         if attempts == LLM_MAX_ATTEMPTS:
-            print("This was the last attempt. Node is dead. Quitting.")
+            print(f"[{node_id}] This was the last attempt. Node is dead. Quitting.")
             return
 
-    send_command(True, node_id, "sudo add-apt-repository ppa:gnuradio/gnuradio-releases")
+def node_configure(node_id):
+    openai_client = OpenAIClient()
+
+    send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
+
+    node_ready_wait(node_id, wait_seconds=30)
+
+    send_command(True, node_id, "sudo add-apt-repository ppa:gnuradio/gnuradio-releases -y")
     send_command(True, node_id, "sudo apt update -y")
     send_command(True, node_id, "sudo apt-get update -y")
     send_command(True, node_id, "sudo apt-get install -y uhd-host net-tools wireless-tools git python3-pip gnuradio gir1.2-gtk-3.0 rfkill")
@@ -106,7 +109,7 @@ def node_configure(node_id):
     send_command(True, node_id, "cd /root/ && git clone https://github.com/i-sense/mobintel-rffi && mv /root/mobintel-rffi/orbit/gnuradio-n210 /root/ && rm -rf /root/mobintel-rffi")
 
     # These commands take a long time to run, but are paramount for reducing background noise, etc
-    send_command(True, node_id, 'uhd_cal_rx_iq_balance --verbose --args="addr=192.168.10.2"')
+    # TODO: send_command(True, node_id, 'uhd_cal_rx_iq_balance --verbose --args="addr=192.168.10.2"')
     # send_command(True, node_id, 'uhd_cal_tx_iq_balance --verbose --args="addr=192.168.10.2"')
     # send_command(True, node_id, 'uhd_cal_tx_dc_offset --verbose --args="addr=192.168.10.2"')
 
@@ -191,6 +194,8 @@ def mode_config(node_ids):
 
 def main():
     print("Welcome! Let's get started.")
+
+    os.system(f"ssh -o StrictHostKeyChecking=no {JUMP_NODE_GRID} rm -rf ~/.ssh/known_hosts")
 
     while True:
         instruction = input("What should we do? [config one | rx one]")

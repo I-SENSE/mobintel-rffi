@@ -1,3 +1,4 @@
+import os
 import time
 import subprocess
 from openai_client import OpenAIClient
@@ -43,28 +44,32 @@ def send_command(jump, node, command, capture_response=False):
         return ''.join(stdout_lines)
     else: return None
 
-def node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k, channel=TX_CHANNEL):
-    openai_client = OpenAIClient()
-
-    send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a offh -t " + node_id)
-    send_command(None, JUMP_NODE_OUTDOOR, "omf load -i baseline-5.4.1.ndz -t " + node_id)
-    send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a on -t " + node_id)
-
+def node_ready_wait(node_id, wait_seconds=30):
     attempts = 0
     while attempts < LLM_MAX_ATTEMPTS:
-        print('Sleeping for 30 seconds before attempting to connect.')
-        time.sleep(30)
+        print(f'Sleeping for {wait_seconds} seconds before attempting to connect.')
+        time.sleep(wait_seconds)
         
         attempts += 1
 
-        can_proceed = openai_client.prompt_is_ls_successful(send_command('outdoor', node_id, "ls /root/", capture_response=True))
+        can_proceed = OpenAIClient().prompt_is_ls_successful(send_command('grid', node_id, "ls /root/", capture_response=True))
 
         if can_proceed:
             break
         
         if attempts == LLM_MAX_ATTEMPTS:
-            print("This was the last attempt. Node is dead. Quitting.")
+            print(f"[{node_id}] This was the last attempt. Node is dead. Quitting.")
             return
+
+def node_configure_ap(node_id, driver_name=WIFI_DRIVER_ATHEROS_10k, channel=TX_CHANNEL):
+    openai_client = OpenAIClient()
+
+    send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a offh -t " + node_id)
+    send_command(None, JUMP_NODE_OUTDOOR, "omf load -i baseline.ndz -t " + node_id)
+    send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a on -t " + node_id)
+    # send_command(None, JUMP_NODE_OUTDOOR, "omf tell -a reboot -t " + node_id)
+
+    node_ready_wait(node_id, wait_seconds=60)
 
     send_command('outdoor', node_id, "sudo apt update -y")
     send_command('outdoor', node_id, "sudo apt-get update -y")
@@ -132,24 +137,14 @@ def node_configure_tx(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
     openai_client = OpenAIClient()
 
     send_command(None, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
-    send_command(None, JUMP_NODE_GRID, "omf load -i baseline-5.4.1.ndz -t " + node_id)
+    send_command(None, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
     send_command(None, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
 
-    attempts = 0
-    while attempts < LLM_MAX_ATTEMPTS:
-        print('Sleeping for 30 seconds before attempting to connect.')
-        time.sleep(30)
-        
-        attempts += 1
+    node_ready_wait(node_id, wait_seconds=90)
 
-        can_proceed = openai_client.prompt_is_ls_successful(send_command('grid', node_id, "ls /root/", capture_response=True))
+    send_command(None, JUMP_NODE_GRID, "omf tell -a reboot -t " + node_id)
 
-        if can_proceed:
-            break
-        
-        if attempts == LLM_MAX_ATTEMPTS:
-            print("This was the last attempt. Node is dead. Quitting.")
-            return
+    node_ready_wait(node_id, wait_seconds=60)
 
     send_command('grid', node_id, "sudo apt update -y")
     send_command('grid', node_id, "sudo apt-get -y update")
@@ -196,6 +191,10 @@ def node_transmission_stop(tx_node_id, ap_node_id):
 
 def main():
     print("Welcome!. Let's get started.")
+
+    os.system(f"ssh -o StrictHostKeyChecking=no {JUMP_NODE_GRID} rm -rf ~/.ssh/known_hosts")
+    os.system(f"ssh -o StrictHostKeyChecking=no {JUMP_NODE_OUTDOOR} rm -rf ~/.ssh/known_hosts")
+
     while True:
         tx_type = input("What should we do? [config tx | config ap | emit one] ")
 

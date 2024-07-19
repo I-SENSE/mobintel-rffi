@@ -1,3 +1,4 @@
+import os
 import time
 import subprocess
 from openai_client import OpenAIClient
@@ -40,15 +41,11 @@ def send_command(needsJump, node, command, capture_response=False):
         return ''.join(stdout_lines)
     else: return None
 
-def node_configure(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
-    send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
-    send_command(False, JUMP_NODE_GRID, "omf load -i baseline-5.4.1.ndz -t " + node_id)
-    send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
-
+def node_ready_wait(node_id, wait_seconds=30):
     attempts = 0
     while attempts < LLM_MAX_ATTEMPTS:
-        print('Sleeping for 30 seconds before attempting to connect.')
-        time.sleep(30)
+        print(f'Sleeping for {wait_seconds} seconds before attempting to connect.')
+        time.sleep(wait_seconds)
         
         attempts += 1
 
@@ -58,8 +55,19 @@ def node_configure(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
             break
         
         if attempts == LLM_MAX_ATTEMPTS:
-            print("This was the last attempt. Node is dead. Quitting.")
+            print(f"[{node_id}] This was the last attempt. Node is dead. Quitting.")
             return
+
+def node_configure(node_id, driver_name=WIFI_DRIVER_ATHEROS_MAIN):
+    send_command(False, JUMP_NODE_GRID, "omf tell -a offh -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf load -i baseline.ndz -t " + node_id)
+    send_command(False, JUMP_NODE_GRID, "omf tell -a on -t " + node_id)
+
+    node_ready_wait(node_id, wait_seconds=60)
+
+    send_command(False, JUMP_NODE_GRID, "omf tell -a reboot -t " + node_id)
+
+    node_ready_wait(node_id, wait_seconds=60)
 
     send_command(True, node_id, "sudo apt update -y")
     send_command(True, node_id, "sudo apt-get -y update")
@@ -174,6 +182,9 @@ def mode_config(nodes):
 
 def main():
     print("Welcome!. Let's get started.")
+
+    os.system(f"ssh -o StrictHostKeyChecking=no {JUMP_NODE_GRID} rm -rf ~/.ssh/known_hosts")
+
     while True:
         tx_type = input("What should we do? [config one | emit one] ")
         if tx_type == 'config one':

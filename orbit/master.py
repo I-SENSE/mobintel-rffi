@@ -20,7 +20,7 @@ RX_NODES = ["node1-1", "node1-20", "node20-1", "node19-19"]
 TX_TRAINING_NODES = ['node5-1', 'node7-10', 'node7-14', 'node2-19', 'node5-5', 'node19-1', 'node20-20', 'node1-10', 'node8-20', 'node11-17', 
                      'node2-6', 'node1-12', 'node4-1', 'node3-13', 'node1-16', 'node8-8', 'node8-18', 'node1-19', 'node1-18', 'node11-7', 
                      'node20-12', 'node4-10', 'node11-4', 'node8-3', 'node4-11', 'node3-18', 'node14-7', 'node10-17', 'node10-11']
-TX_TESTING_NODES = ['node12-20', 'node17-11', 'node20-19', 'node20-15', 'node14-10', 'node16-16', 'node15-1', 'node16-1'] # TODO: pick 14th, 15th node!!!!!!!
+TX_TESTING_NODES = ['node12-20', 'node17-11', 'node20-19', 'node20-15', 'node14-10', 'node16-16', 'node15-1', 'node16-1', 'node1-2', 'node1-11', 'node2-1', 'node2-20'] 
 
 TX_INTERVAL = "0.01" # Interval (in seconds) between injected probe requests
 TX_SSID = "smazokha" # Name of the SSID which we'll use in the probe requests (irrelevant)
@@ -30,8 +30,8 @@ RX_CAP_LEN_UDP = "2" # For how many seconds should we capture UDP traffic
 RX_CAP_LEN_PROBES = "10" # For how many seconds should we capture Probe Request traffoc
 CONFIG_BATCH_SIZE = 15 # How many parallel config sessions should we run in parallel
 AWS_S3_BUCKET_NAME = 'mobintel-orbit-dataset'
-EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root experiment dir on local device
-# EXPERIMENT_DIR = '/home/smazokha2016/Desktop/orbit_experiment/' # Root experiment dir on CA-AI server
+# EXPERIMENT_DIR = '/Users/stepanmazokha/Desktop/orbit_experiment/' # Root experiment dir on local device
+EXPERIMENT_DIR = '/home/smazokha2016/Desktop/orbit_experiment/' # Root experiment dir on CA-AI server
 
 # Generates a 'virtual' MAC address (first 3 octets are the same, the remaining are randomized)
 def generate_virtual_mac():

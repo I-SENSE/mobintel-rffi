@@ -107,7 +107,7 @@ def node_configure(node_id):
 
     send_command(True, node_id, f'/usr/lib/uhd/examples/test_pps_input --args=\"{RX_USRP_IP}\" --source external')
 
-    send_command(True, node_id, "cd /root/ && git clone https://github.com/i-sense/mobintel-rffi && mv /root/mobintel-rffi/orbit/gnuradio-n210 /root/ && rm -rf /root/mobintel-rffi")
+    send_command(True, node_id, "cd /root/ && git clone https://github.com/i-sense/mobintel-rffi && mv /root/mobintel-rffi/orbit-capture/gnuradio-n210 /root/ && rm -rf /root/mobintel-rffi")
 
     # These commands take a long time to run, but are paramount for reducing background noise, etc
     send_command(True, node_id, 'uhd_cal_rx_iq_balance --verbose --args="addr=192.168.10.2"')

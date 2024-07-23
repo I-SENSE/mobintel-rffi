@@ -24,7 +24,7 @@ S3_EXPERIMENT_NAME = "orbit_experiment_jul_19"
 S3_EPOCH_PREFIX = "epoch_"
 S3_TRAINING_PREFIX = "training_"
 RFFI_DATASET_TARGET_DIR = f'{ROOT_DIR}/{S3_BUCKET_NAME}_h5/'
-FRAME_COUNT = 400
+FRAME_COUNT = 350
 
 # Extracts signal configs from a file name in a dataset
 # - filename: name of the .dat file (without the route)
@@ -225,6 +225,8 @@ def main():
 
             if preamble_iq.shape[0] < FRAME_COUNT:
                 print(f"Insufficient frames captured: {dat_file}")
+                print(f"Deleting local file {local_filepath}")
+                os.remove(local_filepath)
                 continue
             else:
                 # 3.3. Store information from a current dat file
@@ -235,9 +237,9 @@ def main():
                     'node_mac': tx_mac
                 })
 
-            # 3.4. Remove local file afer the processing is completed
-            print(f"Deleting local file {local_filepath}")
-            os.remove(local_filepath)
+                # 3.4. Remove local file afer the processing is completed
+                print(f"Deleting local file {local_filepath}")
+                os.remove(local_filepath)
 
         epoch_save(node_ids, RFFI_DATASET_TARGET_DIR, epoch_preambles, session_name, preamble_len)
 

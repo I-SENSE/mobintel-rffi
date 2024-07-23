@@ -26,7 +26,7 @@ S3_EXPERIMENT_NAME = "orbit_experiment_jul_19"
 S3_EPOCH_PREFIX = "epoch_"
 S3_TRAINING_PREFIX = "training_"
 RFFI_DATASET_TARGET_DIR = f'{ROOT_DIR}/{S3_BUCKET_NAME}_h5/'
-FRAME_COUNT = 400
+FRAME_COUNT = 350
 
 COMPLETED_SESSIONS = [
     "epoch_2024-07-20_01-15-26",
@@ -40,9 +40,11 @@ COMPLETED_SESSIONS = [
     "epoch_2024-07-20_02-36-13",
     "epoch_2024-07-20_02-46-20",
     "epoch_2024-07-20_02-56-33",
-    "epoch_2024-07-20_03-06-43"]
+    "epoch_2024-07-20_03-06-43",
+    "epoch_2024-07-20_03-16-52"]
 
 MATLAB_SESSION_NAMES = [
+    'mobintel_engine',
     'mobintel_session_1',
     'mobintel_session_2', 
     'mobintel_session_3', 

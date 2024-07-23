@@ -41,7 +41,15 @@ COMPLETED_SESSIONS = [
     "epoch_2024-07-20_02-46-20",
     "epoch_2024-07-20_02-56-33",
     "epoch_2024-07-20_03-06-43",
-    "epoch_2024-07-20_03-16-52"]
+    "epoch_2024-07-20_03-16-52",
+    "epoch_2024-07-20_03-27-03",
+    "epoch_2024-07-20_03-37-12",
+    "epoch_2024-07-20_03-47-33",
+    "epoch_2024-07-20_03-57-50",
+    "epoch_2024-07-20_04-07-54",
+
+    "epoch_2024-07-21_12-15-52",
+    "training_2024-07-20_00-50-38"]
 
 MATLAB_SESSION_NAMES = [
     'mobintel_engine',
@@ -244,6 +252,9 @@ def process_session(matlab_engine_queue, session_name, preamble_len, node_ids, n
         dat_file_preambles = None
         try:
             dat_file_preambles = process_dat_file(matlab_engine, session_name, dat_file, node_macs, preamble_len)
+        except Exception as e:
+            print(f"Something happened: {dat_file}")
+            print(e)
         finally:
             matlab_engine_queue.put(matlab_engine)
         return (dat_file_preambles, dat_file)

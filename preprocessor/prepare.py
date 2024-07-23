@@ -1,5 +1,7 @@
 import os
 import numpy as np
+import queue
+import concurrent.futures
 import re
 import h5py
 import json
@@ -24,7 +26,35 @@ S3_EXPERIMENT_NAME = "orbit_experiment_jul_19"
 S3_EPOCH_PREFIX = "epoch_"
 S3_TRAINING_PREFIX = "training_"
 RFFI_DATASET_TARGET_DIR = f'{ROOT_DIR}/{S3_BUCKET_NAME}_h5/'
-FRAME_COUNT = 350
+FRAME_COUNT = 400
+
+COMPLETED_SESSIONS = [
+    "epoch_2024-07-20_01-15-26",
+    "epoch_2024-07-20_01-25-24",
+    "epoch_2024-07-20_01-35-29",
+    "epoch_2024-07-20_01-45-36",
+    "epoch_2024-07-20_01-55-39",
+    "epoch_2024-07-20_02-05-44",
+    "epoch_2024-07-20_02-15-49",
+    "epoch_2024-07-20_02-26-04",
+    "epoch_2024-07-20_02-36-13",
+    "epoch_2024-07-20_02-46-20",
+    "epoch_2024-07-20_02-56-33",
+    "epoch_2024-07-20_03-06-43"]
+
+MATLAB_SESSION_NAMES = [
+    'mobintel_session_1',
+    'mobintel_session_2', 
+    'mobintel_session_3', 
+    'mobintel_session_4',
+    'mobintel_session_5',
+    'mobintel_session_6',
+    'mobintel_session_7',
+    'mobintel_session_8']
+
+# MATLAB_SESSION_NAMES = ['mobintel_session_1']
+
+MAX_THREADS = len(MATLAB_SESSION_NAMES)
 
 # Extracts signal configs from a file name in a dataset
 # - filename: name of the .dat file (without the route)
@@ -48,7 +78,7 @@ def parse_dat_name(filename):
     }
 
 # Reads a JSON file containing MAC addresses of devices
-def get_device_macs(file_path):
+def read_json_file(file_path):
     with open(file_path, 'r') as file:
         data = json.load(file)
 
@@ -159,6 +189,87 @@ def request_preamble_len():
         return int(input("What should be preamble length? [400] "))
     except:
         return 400
+    
+def process_dat_file(matlab_engine, session_name, dat_file, node_macs, preamble_len):
+    print(f"Processing {dat_file}")
+
+    # 3.1. Download the file from S3
+    s3_filepath = f"{S3_EXPERIMENT_NAME}/{session_name}/{dat_file}"
+    local_filepath = os.path.join(TEMP_IQ_DIRECTORY, dat_file)
+    print(f'Downloading {dat_file}...')
+    download_file_with_progress(S3_BUCKET_NAME, s3_filepath, local_filepath)
+
+    # 3.2. Extract signal info from its name
+    dat_config = parse_dat_name(dat_file)
+    tx_name = dat_config['node_tx'][4:]
+    rx_name = dat_config['node_rx'][4:]
+    samp_rate = dat_config['samp_rate']
+
+    # 3.3. Retrieve node MAC address
+    tx_mac = node_macs[tx_name]['mac']
+
+    # 3.2. Decode the file via MATLAB script, extract preambles
+    response = matlab_engine.find_tx_frames(local_filepath, 'CBW20', samp_rate, tx_mac, preamble_len)
+    # preamble_bounds = np.array(response['preamble_bounds']).squeeze()
+    preamble_iq = np.array(response['preamble_iq']).squeeze()
+
+    # 3.3. Prepare information from a current dat file
+    if preamble_iq.shape[0] >= FRAME_COUNT:
+        file_preambles = {
+            'preambles': preamble_iq[0:FRAME_COUNT, :],
+            'node_tx': tx_name,
+            'node_rx': rx_name,
+            'node_mac': tx_mac
+        }
+    else: file_preambles = None
+
+    # 3.4. Remove local file afer the processing is completed
+    print(f"Deleting local file {local_filepath}")
+    os.remove(local_filepath)
+
+    return file_preambles
+
+def process_session(matlab_engine_queue, session_name, preamble_len, node_ids, node_macs):
+    if not is_session_valid(session_name):
+        print("Skipping session", session_name)
+        return
+    else: print("Processing session ", session_name)
+
+    # Retrieve list of all .dat files to process
+    session_dat_files = s3_list_files(S3_BUCKET_NAME, S3_EXPERIMENT_NAME + "/" + session_name + "/")
+
+    # Prepare a dictionary to store preambles for this session (aka epoch)
+    epoch_preambles = defaultdict(list)
+
+    # Define a worker function that would prepare a matlab engine for work
+    def worker(session_name, dat_file, node_macs, preamble_len):
+        # Retrieve name of the session
+        matlab_engine = matlab_engine_queue.get()
+        dat_file_preambles = None
+        try:
+            dat_file_preambles = process_dat_file(matlab_engine, session_name, dat_file, node_macs, preamble_len)
+        finally:
+            matlab_engine_queue.put(matlab_engine)
+        return (dat_file_preambles, dat_file)
+
+    # Initialize parallel analysis for all .dat files
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
+        futures = [executor.submit(worker, session_name, dat_file, node_macs, preamble_len) for dat_file in session_dat_files]
+        concurrent.futures.wait(futures)
+
+        for future in concurrent.futures.as_completed(futures):
+            dat_file_preambles, dat_file = future.result()
+
+            if dat_file_preambles:
+                rx_name = dat_file_preambles['node_rx']
+                epoch_preambles[rx_name].append(dat_file_preambles)
+            else: print(f"Insufficient frames captured: {dat_file}")
+
+    # Save information for this session/epoch into a final dataset file
+    epoch_save(node_ids, RFFI_DATASET_TARGET_DIR, epoch_preambles, session_name, preamble_len)
+
+    print(f"Session {session_name} processing is complete.")
+    print("=========================================================================")
 
 def main():
     preamble_len = request_preamble_len()
@@ -167,16 +278,10 @@ def main():
     if not os.path.exists(RFFI_DATASET_TARGET_DIR):
         os.makedirs(RFFI_DATASET_TARGET_DIR)
 
-    # Set up the MATLAB environment before starting
-    matlab_engine_name = input('Matlab engine name to connect to [mobintel_engine]: ')
-    if len(matlab_engine_name) == 0: matlab_engine_name = 'mobintel_engine'
-    mateng = matlab.engine.connect_matlab(matlab_engine_name)
-    mateng.cd(MATLAB_OFDM_DECODER, nargout=0)
-
     # Load a JSON file with device MAC addresses from S3 experiment folder
-    device_macs_local_path = os.path.join(RFFI_DATASET_TARGET_DIR, NODE_MACS)
-    download_file_with_progress(S3_BUCKET_NAME, f"{S3_EXPERIMENT_NAME}/{NODE_MACS}", device_macs_local_path)
-    device_macs = get_device_macs(device_macs_local_path)
+    node_macs_local_path = os.path.join(RFFI_DATASET_TARGET_DIR, NODE_MACS)
+    download_file_with_progress(S3_BUCKET_NAME, f"{S3_EXPERIMENT_NAME}/{NODE_MACS}", node_macs_local_path)
+    node_macs = read_json_file(node_macs_local_path)
 
     # Generate a dictionary of node IDs
     node_ids = generate_node_ids()
@@ -184,64 +289,22 @@ def main():
     # Obtain a list of epochs in the experiment
     sessions = s3_list_subdirs(S3_BUCKET_NAME, S3_EXPERIMENT_NAME + '/')
 
-    # Process each session (aka epoch)
+    # Initialize a queue that would store all available Matlab engine instances
+    matlab_engine_queue = queue.Queue()
+    for engine_name in MATLAB_SESSION_NAMES:
+        print(f"Connecting to engine {engine_name}... ", end='')
+        matlab_engine = matlab.engine.connect_matlab(engine_name)
+        matlab_engine.cd(MATLAB_OFDM_DECODER, nargout=0)
+        matlab_engine_queue.put(matlab_engine)
+        print("connected")
+
+    # Work throughe each session (aka training / testing epochs)
     for session_name in sessions:
-        if not is_session_valid(session_name):
-            print("Skipping session", session_name)
+        if session_name in COMPLETED_SESSIONS:
+            print(f"Session {session_name} already completed.")
             continue
-
-        print("Processing session ", session_name)
-        session_dat_files = s3_list_files(S3_BUCKET_NAME, S3_EXPERIMENT_NAME + "/" + session_name + "/")
-
-        # Prepare a dictionary to store preambles for this epoch
-        epoch_preambles = defaultdict(list)
-        rx_nodes = set()
-
-        # 3. Process each .dat file
-        for dat_file in session_dat_files:
-            print(f"- {dat_file}")
-
-            # 3.1. Download the file from S3
-            s3_filepath = f"{S3_EXPERIMENT_NAME}/{session_name}/{dat_file}"
-            local_filepath = os.path.join(TEMP_IQ_DIRECTORY, dat_file)
-            print(f'Downloading {dat_file}...')
-            download_file_with_progress(S3_BUCKET_NAME, s3_filepath, local_filepath)
-
-            # 3.2. Extract signal info from its name
-            dat_config = parse_dat_name(dat_file)
-            tx_name = dat_config['node_tx'][4:]
-            rx_name = dat_config['node_rx'][4:]
-            samp_rate = dat_config['samp_rate']
-
-            rx_nodes.add(rx_name)
-
-            # 3.3. Retrieve node MAC address
-            tx_mac = device_macs[tx_name]['mac']
-
-            # 3.2. Decode the file via MATLAB script, extract preambles
-            response = mateng.find_tx_frames(local_filepath, 'CBW20', samp_rate, tx_mac, preamble_len)
-            # preamble_bounds = np.array(response['preamble_bounds']).squeeze()
-            preamble_iq = np.array(response['preamble_iq']).squeeze()
-
-            if preamble_iq.shape[0] < FRAME_COUNT:
-                print(f"Insufficient frames captured: {dat_file}")
-                print(f"Deleting local file {local_filepath}")
-                os.remove(local_filepath)
-                continue
-            else:
-                # 3.3. Store information from a current dat file
-                epoch_preambles[rx_name].append({
-                    'preambles': preamble_iq[0:FRAME_COUNT, :],
-                    'node_tx': tx_name,
-                    'node_rx': rx_name,
-                    'node_mac': tx_mac
-                })
-
-                # 3.4. Remove local file afer the processing is completed
-                print(f"Deleting local file {local_filepath}")
-                os.remove(local_filepath)
-
-        epoch_save(node_ids, RFFI_DATASET_TARGET_DIR, epoch_preambles, session_name, preamble_len)
+        else: 
+            process_session(matlab_engine_queue, session_name, preamble_len, node_ids, node_macs)
 
 if __name__ == "__main__":
     main()

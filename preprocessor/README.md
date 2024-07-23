@@ -11,6 +11,19 @@ How does it work:
 
 How to run prepare.py:
 
+On macOS: 
+
+1. Ensure that you can launch matlab in Terminal: `alias matlab="/Applications/MATLAB_R2024a.app/bin/matlab"`
+
+    Optionally, add it to ~/.bash_profile, and then run `source ~/.bash_profile` 
+
+2. In multiple terminal windows, open N matlab sessions: `matlab -nodesktop -r "matlab.engine.shareEngine('mobintel_session_M')"`
+
+    * N would need to be changed to the index of your session
+    * Start as many sessions as you specified in the `MATLAB_SESSION_NAMES` list in the script
+
+
+
 1. Launch Matlab on your device
 2. Share Matlab engine:
 

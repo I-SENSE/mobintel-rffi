@@ -185,12 +185,6 @@ def epoch_save(node_ids_dict, target_dir, epoch_preambles, session_name, preambl
 
 def is_session_valid(session_name):
     return session_name[0:6] == 'epoch_' or session_name[0:9] == 'training_'
-
-def request_preamble_len():
-    try:
-        return int(input("What should be preamble length? [400] "))
-    except:
-        return 400
     
 def process_dat_file(matlab_engine, session_name, dat_file, node_macs, preamble_len):
     print(f"Processing {dat_file}")
@@ -273,6 +267,25 @@ def process_session(matlab_engine_queue, session_name, preamble_len, node_ids, n
     print(f"Session {session_name} processing is complete.")
     print("=========================================================================")
 
+def request_preamble_len():
+    try:
+        return int(input("What should be preamble length? [400] "))
+    except:
+        return 400
+    
+def request_mode_session():
+    while True:
+        mode = input("Which mode should we run? [single | full]")
+
+        if mode == 'single':
+            session_name = input("Which session should we process? [e.g., epoch_....]")
+            if is_session_valid(session_name):
+                return session_name
+            else: print("Invalid session name.")
+        elif mode == 'full':
+            return None
+        else: print('Invalid command.')
+
 def main():
     preamble_len = request_preamble_len()
 
@@ -288,8 +301,13 @@ def main():
     # Generate a dictionary of node IDs
     node_ids = generate_node_ids()
 
-    # Obtain a list of epochs in the experiment
-    sessions = s3_list_subdirs(S3_BUCKET_NAME, S3_EXPERIMENT_NAME + '/')
+    # Let the user chose whether to run all sessions (from S3) or just one
+    requested_session = request_mode_session()
+    if requested_session: 
+        sessions = [requested_session] 
+    else: 
+        sessions = s3_list_subdirs(S3_BUCKET_NAME, S3_EXPERIMENT_NAME + '/')
+    print(f"Starting to process {len(sessions)} sessions.")
 
     # Initialize a queue that would store all available Matlab engine instances
     matlab_engine_queue = queue.Queue()

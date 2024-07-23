@@ -148,7 +148,6 @@ def epoch_save(node_ids_dict, target_dir, epoch_preambles, session_name, preambl
 
                 h5_idx = h5_idx + 1
 
-
         dataset_filepath = os.path.join(target_dir, f'node{rx_name}_{session_name}.h5')
         save_dataset_h5(dataset_filepath, h5_labels, h5_data)
 
@@ -227,16 +226,16 @@ def main():
             if preamble_iq.shape[0] < FRAME_COUNT:
                 print(f"Insufficient frames captured: {dat_file}")
                 continue
+            else:
+                # 3.3. Store information from a current dat file
+                epoch_preambles[rx_name].append({
+                    'preambles': preamble_iq[0:FRAME_COUNT, :],
+                    'node_tx': tx_name,
+                    'node_rx': rx_name,
+                    'node_mac': tx_mac
+                })
 
-            # 3.3. Store information from a current dat file
-            epoch_preambles[rx_name].append({
-                'preambles': preamble_iq[0:FRAME_COUNT, :],
-                'node_tx': tx_name,
-                'node_rx': rx_name,
-                'node_mac': tx_mac
-            })
-
-            # 3.N. Remove local file afer the processing is completed
+            # 3.4. Remove local file afer the processing is completed
             print(f"Deleting local file {local_filepath}")
             os.remove(local_filepath)
 

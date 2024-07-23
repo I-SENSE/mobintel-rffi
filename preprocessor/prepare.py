@@ -13,14 +13,17 @@ load_dotenv()
 
 s3 = boto3.client('s3')
 
-MATLAB_OFDM_DECODER = '/Users/stepanmazokha/Desktop/mobintel-rffi/preprocessor/frame_mac_detection'
-TEMP_IQ_DIRECTORY = '/Users/stepanmazokha/Desktop/orbit_processor_temp/'
-NODE_MACS = '/Users/stepanmazokha/Desktop/orbit_device_macs.json'
+ROOT_DIR = '/home/smazokha2016/Desktop'
+# ROOT_DIR = '/Users/stepanmazokha/Desktop'
+
+MATLAB_OFDM_DECODER = ROOT_DIR + '/mobintel-rffi/preprocessor/frame_mac_detection'
+TEMP_IQ_DIRECTORY = ROOT_DIR + '/orbit_processor_temp/'
+NODE_MACS = 'experiment_device_macs.json'
 S3_BUCKET_NAME = "mobintel-orbit-dataset"
 S3_EXPERIMENT_NAME = "orbit_experiment_jul_19"
 S3_EPOCH_PREFIX = "epoch_"
 S3_TRAINING_PREFIX = "training_"
-RFFI_DATASET_TARGET_DIR = f'/Users/stepanmazokha/Desktop/{S3_BUCKET_NAME}_h5/'
+RFFI_DATASET_TARGET_DIR = f'{ROOT_DIR}/{S3_BUCKET_NAME}_h5/'
 FRAME_COUNT = 400
 
 # Extracts signal configs from a file name in a dataset
@@ -171,8 +174,10 @@ def main():
     mateng = matlab.engine.connect_matlab(matlab_engine_name)
     mateng.cd(MATLAB_OFDM_DECODER, nargout=0)
 
-    # Load a JSON file with device MAC addresses
-    device_macs = get_device_macs(NODE_MACS)
+    # Load a JSON file with device MAC addresses from S3 experiment folder
+    device_macs_local_path = os.path.join(RFFI_DATASET_TARGET_DIR, NODE_MACS)
+    download_file_with_progress(S3_BUCKET_NAME, f"{S3_EXPERIMENT_NAME}/{NODE_MACS}", device_macs_local_path)
+    device_macs = get_device_macs(device_macs_local_path)
 
     # Generate a dictionary of node IDs
     node_ids = generate_node_ids()

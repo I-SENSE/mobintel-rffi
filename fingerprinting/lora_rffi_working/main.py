@@ -210,7 +210,7 @@ if __name__ == '__main__':
     # run_for = 'Train'
     run_for = 'Classification'
 
-    root_path = '/home/smazokha2016/Desktop/orbit_pickles_rffi_dataset'
+    root_path = '/home/smazokha2016/Desktop/orbit_dataset_1rx/orbit_pickles_rffi_dataset'
     dataset_train = '/training_2024-07-13_06-53-20'
     # dataset_enrol = '/epoch_2024-07-13_07-40-21'
     dataset_enrol = '/epoch_2024-07-13_08-14-13'

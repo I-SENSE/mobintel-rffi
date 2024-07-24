@@ -4,13 +4,15 @@
 
 close all; clear; clc;
 
-% TX_NODE_1_10 = '00:60:b3:ac:a1:cb';
-TX_NODE_1_11 = '00:60:b3:25:c0:2f';
+% TX_NODE = '00:60:b3:ac:a1:cb';
+% TX_NODE = '00:60:b3:25:c0:2f';
+TX_NODE = '00:60:b3:ac:a1:cb';
 
-X_path = '/Users/stepanmazokha/Desktop/node19-19_25msps.dat';
+% X_path = '/Users/stepanmazokha/Desktop/node19-19_25msps.dat';
+X_path = '/Users/stepanmazokha/Desktop/orbit_processor_temp/tx{node_node1-10}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_10+rxSampRate_20e6}.dat';
 
-T = find_tx_frames(X_path, 'CBW20', 25e6, TX_NODE_1_11, 400);
+T = find_tx_frames(X_path, 'CBW20', 20e6, TX_NODE, 400);
 
-fprintf('Captured UDP frames: %i', length(preamble_bounds));
+fprintf('Captured UDP frames: %i', length(T.('preamble_bounds')));
 
-plot_recognized_frames(X, preamble_bounds);
+plot_recognized_frames(X, T.('preamble_bounds'));

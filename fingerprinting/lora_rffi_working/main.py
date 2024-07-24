@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import roc_curve, auc , confusion_matrix, accuracy_score
@@ -10,12 +11,16 @@ from keras.optimizers import RMSprop
 from dataset_preparation import awgn, LoadDataset, ChannelIndSpectrogram
 from deep_learning_models import TripletNet, identity_loss
 
+TRAINING_NODES_COUNT = 30
+TESTING_NODES_COUNT = 10
+SAMPLES_COUNT_TRAIN = 400
+SAMPLES_COUNT_TEST = 100
+
 def train_feature_extractor(
         file_path = './dataset/Train/dataset_training_aug.h5', 
-        dev_range = np.arange(0,30, dtype = int), 
-        pkt_range = np.arange(0,400, dtype = int), # TODO: was 1000
-        snr_range = np.arange(20,80)
-                            ):
+        dev_range = np.arange(0,TRAINING_NODES_COUNT, dtype = int), 
+        pkt_range = np.arange(0,SAMPLES_COUNT_TRAIN, dtype = int),
+        snr_range = np.arange(20,80)):
     '''
     train_feature_extractor trains an RFF extractor using triplet loss.
     
@@ -121,11 +126,10 @@ def test_classification(
         file_path_enrol,
         file_path_clf,
         feature_extractor_name,
-        dev_range_enrol = np.arange(0,10, dtype = int),
-        pkt_range_enrol = np.arange(0,100, dtype = int),
-        dev_range_clf = np.arange(0,10, dtype = int),
-        pkt_range_clf = np.arange(300,400, dtype = int)
-                        ):
+        dev_range_enrol = np.arange(0,TESTING_NODES_COUNT, dtype = int),
+        pkt_range_enrol = np.arange(0,SAMPLES_COUNT_TEST, dtype = int),
+        dev_range_clf = np.arange(0,TESTING_NODES_COUNT, dtype = int),
+        pkt_range_clf = np.arange(0,SAMPLES_COUNT_TEST, dtype = int)):
     '''
     test_classification performs a classification task and returns the 
     classification accuracy.
@@ -164,23 +168,27 @@ def test_classification(
                                                              dev_range_enrol, 
                                                              pkt_range_enrol)
     
+    print(f"Data enrol shape: {data_enrol.shape}")
+    
     ChannelIndSpectrogramObj = ChannelIndSpectrogram()
     
     # Convert IQ samples to channel independent spectrograms. (enrollment data)
     data_enrol = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_enrol)
     
-    # # Visualize channel independent spectrogram
+    # Visualize channel independent spectrogram
     # plt.figure()
     # sns.heatmap(data_enrol[0,:,:,0],xticklabels=[], yticklabels=[], cmap='Blues', cbar=False)
     # plt.gca().invert_yaxis()
+    # plt.show()
     # plt.savefig('channel_ind_spectrogram.pdf')
     
     # Extract RFFs from channel independent spectrograms.
+    print("Generating enrollment fingerprints...")
     feature_enrol = feature_extractor.predict(data_enrol)
     del data_enrol
     
     # Create a K-NN classifier using the RFFs extracted from the enrollment dataset.
-    knnclf=KNeighborsClassifier(n_neighbors=10,metric='euclidean')
+    knnclf=KNeighborsClassifier(n_neighbors=20,metric='euclidean')
     knnclf.fit(feature_enrol, np.ravel(label_enrol))
     
     
@@ -189,10 +197,13 @@ def test_classification(
                                                          dev_range_clf, 
                                                          pkt_range_clf)
     
+    print(f"Data identify shape: {data_clf.shape}")
+    
     # Convert IQ samples to channel independent spectrograms. (classification data)
     data_clf = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_clf)
 
     # Extract RFFs from channel independent spectrograms.
+    print("Generating fingerprints for comparison")
     feature_clf = feature_extractor.predict(data_clf)
     del data_clf
     
@@ -205,15 +216,23 @@ def test_classification(
     
     return pred_label, true_label, acc
 
+def request_mode():
+    while True:
+        mode = input("Which mode should we run? [train | classify]")
+        if mode == 'train':
+            return 'Train'
+        elif mode == 'classify':
+            return 'Classification'
+        else: print("Invalid command.")
+
 if __name__ == '__main__':
     
-    # run_for = 'Train'
-    run_for = 'Classification'
+    run_for = request_mode()
 
-    root_path = '/home/smazokha2016/Desktop/orbit_dataset_1rx/orbit_pickles_rffi_dataset'
-    dataset_train = '/training_2024-07-13_06-53-20'
+    # root_path = '/home/smazokha2016/Desktop/orbit_dataset_1rx/orbit_pickles_rffi_dataset'
+    # dataset_train = '/training_2024-07-13_06-53-20'
     # dataset_enrol = '/epoch_2024-07-13_07-40-21'
-    dataset_enrol = '/epoch_2024-07-13_08-14-13'
+    # dataset_enrol = '/epoch_2024-07-13_08-14-13'
     # dataset_identify = '/epoch_2024-07-13_07-40-21'
     # dataset_identify = '/epoch_2024-07-13_07-52-31'
     # dataset_identify = '/epoch_2024-07-13_08-03-18'
@@ -221,24 +240,48 @@ if __name__ == '__main__':
     # dataset_identify = '/epoch_2024-07-13_08-27-13'
     # dataset_identify = '/epoch_2024-07-13_08-38-59'
     # dataset_identify = '/epoch_2024-07-13_08-51-04'
-    dataset_identify = '/epoch_2024-07-13_09-02-07'
+    # dataset_identify = '/epoch_2024-07-13_09-02-07'
     # dataset_identify = '/epoch_2024-07-13_09-17-04'
     # dataset_identify = '/epoch_2024-07-13_09-31-48'
-    
+
+    # Dataset: Orbit v1 (manual capture over a 2-hour period)
+    root_path = '/home/smazokha2016/Desktop/orbit_dataset_1rx/orbit_pickles_rffi_dataset'
+    dataset_train = os.path.join(root_path, 'training_2024-07-13_06-53-20', 'node1-1_non_eq_train.h5')
+    dataset_enrol = os.path.join(root_path, 'epoch_2024-07-13_07-40-21', 'node1-1_non_eq_test.h5')
+    dataset_identify = os.path.join(root_path, 'epoch_2024-07-13_07-52-31', 'node1-1_non_eq_test.h5')
+    model_path = os.path.join(root_path, 'my_models')
+
+    # Dataset: Orbit v2 (automated capture)
+    # root_path = '/home/smazokha2016/Desktop/mobintel-orbit-dataset_h5'
+    # dataset_train = '/node1-1_training_2024-07-21_14-49-09.h5'
+    # dataset_enrol = '/node1-1_epoch_2024-07-21_16-02-04.h5'
+    # dataset_identify = '/node1-1_epoch_2024-07-21_16-26-15.h5'
+    # # dataset_identify = '/node1-1_epoch_2024-07-21_20-20-50.h5'
+    # model_path = '/orbit_models'
+
+    # Mixed breed (model from experiment v1, enrol from v1, id from v2)
+    # root_path_v1 = '/home/smazokha2016/Desktop/orbit_dataset_1rx/orbit_pickles_rffi_dataset'
+    # root_path_v2 = '/home/smazokha2016/Desktop/mobintel-orbit-dataset_h5'
+
+    # dataset_train = os.path.join(root_path_v1, 'training_2024-07-13_06-53-20', 'node1-1_non_eq_train.h5')
+    # dataset_enrol = os.path.join(root_path_v1, 'epoch_2024-07-13_07-40-21', 'node1-1_non_eq_test.h5')
+    # dataset_identify = os.path.join(root_path_v2, 'node1-1_epoch_2024-07-21_16-26-15.h5')
+
+    # model_path = os.path.join(root_path_v1, 'my_models', 'Extractor_Orbit_day1.h5')
+
+    print(dataset_train)
+
     if run_for == 'Train':
-        feature_extractor = train_feature_extractor(root_path + dataset_train + '/node1-1_non_eq_train.h5')
-        feature_extractor.save(root_path + '/my_models/Extractor_Orbit_day1.h5')
+        feature_extractor = train_feature_extractor(dataset_train)
+        feature_extractor.save(model_path)
     elif run_for == 'Classification':
         # Specify the device index range for classification.
-        test_dev_range = np.arange(0,10, dtype = int)
+        test_dev_range = np.arange(0, 10, dtype = int)
         
         # Perform the classification task.
-        pred_label, true_label, acc = test_classification(file_path_enrol = 
-                                                          root_path + dataset_enrol + '/node1-1_non_eq_test.h5',
-                                                          file_path_clf = 
-                                                          root_path + dataset_identify + '/node1-1_non_eq_test.h5',
-                                                          feature_extractor_name = 
-                                                          root_path + '/my_models/Extractor_Orbit_day1.h5')
+        pred_label, true_label, acc = test_classification(file_path_enrol = dataset_enrol,
+                                                          file_path_clf = dataset_identify,
+                                                          feature_extractor_name = model_path)
         
         # Plot the confusion matrix.
         conf_mat = confusion_matrix(true_label, pred_label, normalize='true')

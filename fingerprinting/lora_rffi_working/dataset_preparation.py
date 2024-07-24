@@ -28,12 +28,7 @@ class LoadDataset():
         
     def _convert_to_complex(self, data):
         '''Convert the loaded data to complex IQ samples.'''
-        num_row = data.shape[0]
-        num_col = data.shape[1] 
-        data_complex = np.zeros([num_row,round(num_col/2)],dtype=complex)
-     
-        data_complex = data[:,:round(num_col/2)] + 1j*data[:,round(num_col/2):] 
-        return data_complex
+        return data[:, 0::2] + 1j * data[:, 1::2]
     
     def load_iq_samples(self, file_path, dev_range, pkt_range):
         '''
@@ -68,18 +63,17 @@ class LoadDataset():
         # print('Dataset information: Dev ' + str(label_start) + ' to Dev ' + 
         #       str(label_end) + ', ' + str(num_pkt_per_dev) + ' packets per device.')
         
-        # sample_index_list = []
-        
-        # for dev_idx in set(label.flatten()):
-        #     sample_index_dev = np.where(label==int(dev_idx))[0][pkt_range].tolist()
-        #     sample_index_list.extend(sample_index_dev)
-
-        # print(len(sample_index_list))
+        # Filter the dataset using a given range of allowed frames
+        sample_index_list = []
+        for dev_idx in set(label.flatten()):
+            sample_index_dev = np.where(label==int(dev_idx))[0][pkt_range].tolist()
+            sample_index_list.extend(sample_index_dev)
     
         data = f[self.dataset_name][:]
         data = self._convert_to_complex(data)
         
-        # label = label[sample_index_list]
+        label = label[sample_index_list]
+        data = data[sample_index_list, :]
           
         f.close()
         return data,label

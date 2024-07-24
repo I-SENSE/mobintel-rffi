@@ -22,37 +22,44 @@ MATLAB_OFDM_DECODER = ROOT_DIR + '/mobintel-rffi/preprocessor/frame_mac_detectio
 TEMP_IQ_DIRECTORY = ROOT_DIR + '/orbit_processor_temp/'
 NODE_MACS = 'experiment_device_macs.json'
 S3_BUCKET_NAME = "mobintel-orbit-dataset"
-S3_EXPERIMENT_NAME = "orbit_experiment_jul_19"
+# S3_EXPERIMENT_NAME = "orbit_experiment_jul_19"
+S3_EXPERIMENT_NAME = "orbit_experiment_jul_21"
 S3_EPOCH_PREFIX = "epoch_"
 S3_TRAINING_PREFIX = "training_"
 RFFI_DATASET_TARGET_DIR = f'{ROOT_DIR}/{S3_BUCKET_NAME}_h5/'
-FRAME_COUNT = 350
+FRAME_COUNT = 400
+
+# COMPLETED_SESSIONS = [
+#     "epoch_2024-07-20_01-15-26",
+#     "epoch_2024-07-20_01-25-24",
+#     "epoch_2024-07-20_01-35-29",
+#     "epoch_2024-07-20_01-45-36",
+#     "epoch_2024-07-20_01-55-39",
+#     "epoch_2024-07-20_02-05-44",
+#     "epoch_2024-07-20_02-15-49",
+#     "epoch_2024-07-20_02-26-04",
+#     "epoch_2024-07-20_02-36-13",
+#     "epoch_2024-07-20_02-46-20",
+#     "epoch_2024-07-20_02-56-33",
+#     "epoch_2024-07-20_03-06-43",
+#     "epoch_2024-07-20_03-16-52",
+#     "epoch_2024-07-20_03-27-03",
+#     "epoch_2024-07-20_03-37-12",
+#     "epoch_2024-07-20_03-47-33",
+#     "epoch_2024-07-20_03-57-50",
+#     "epoch_2024-07-20_04-07-54",
+
+#     "epoch_2024-07-21_12-15-52",
+#     "training_2024-07-20_00-50-38"]
 
 COMPLETED_SESSIONS = [
-    "epoch_2024-07-20_01-15-26",
-    "epoch_2024-07-20_01-25-24",
-    "epoch_2024-07-20_01-35-29",
-    "epoch_2024-07-20_01-45-36",
-    "epoch_2024-07-20_01-55-39",
-    "epoch_2024-07-20_02-05-44",
-    "epoch_2024-07-20_02-15-49",
-    "epoch_2024-07-20_02-26-04",
-    "epoch_2024-07-20_02-36-13",
-    "epoch_2024-07-20_02-46-20",
-    "epoch_2024-07-20_02-56-33",
-    "epoch_2024-07-20_03-06-43",
-    "epoch_2024-07-20_03-16-52",
-    "epoch_2024-07-20_03-27-03",
-    "epoch_2024-07-20_03-37-12",
-    "epoch_2024-07-20_03-47-33",
-    "epoch_2024-07-20_03-57-50",
-    "epoch_2024-07-20_04-07-54",
+    'epoch_2024-07-21_16-02-04',
+    'epoch_2024-07-21_16-26-15',
+    'epoch_2024-07-21_20-20-50',
 
-    "epoch_2024-07-21_12-15-52",
-    "training_2024-07-20_00-50-38"]
+    'training_2024-07-21_14-49-09']
 
 MATLAB_SESSION_NAMES = [
-    'mobintel_engine',
     'mobintel_session_1',
     'mobintel_session_2', 
     'mobintel_session_3', 

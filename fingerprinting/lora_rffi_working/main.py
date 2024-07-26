@@ -287,12 +287,12 @@ if __name__ == '__main__':
         conf_mat = confusion_matrix(true_label, pred_label, normalize='true')
         classes = test_dev_range + 1
         
-        plt.figure()
-        sns.heatmap(conf_mat, annot=True, 
-                    cmap='Blues',
-                    cbar = False,
-                    xticklabels=classes, 
-                    yticklabels=classes)
-        plt.xlabel('Predicted label', fontsize = 20)
-        plt.ylabel('True label', fontsize = 20)
-        plt.show()
+        # plt.figure()
+        # sns.heatmap(conf_mat, annot=True, 
+        #             cmap='Blues',
+        #             cbar = False,
+        #             xticklabels=classes, 
+        #             yticklabels=classes)
+        # plt.xlabel('Predicted label', fontsize = 20)
+        # plt.ylabel('True label', fontsize = 20)
+        # plt.show()

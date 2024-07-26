@@ -29,6 +29,16 @@ class LoadDataset():
     def _convert_to_complex(self, data):
         '''Convert the loaded data to complex IQ samples.'''
         return data[:, 0::2] + 1j * data[:, 1::2]
+
+    def shuffle(self, data, labels):
+        # Produce a new order for elements
+        new_order = np.arange(labels.shape[0])
+        np.random.shuffle(new_order)
+
+        data = data[new_order, :]
+        labels = labels[new_order]
+
+        return data, labels
     
     def load_iq_samples(self, file_path, dev_range, pkt_range):
         '''
@@ -50,33 +60,30 @@ class LoadDataset():
         f = h5py.File(file_path,'r')
         label = f[self.labelset_name][:]
         label = label.astype(int)
-        # label = np.transpose(label)
-        # label = label - 1
-        # print(label[0])
 
-        # label_start = int(label[0]) + 1
-        # label_end = int(label[-1]) + 1
-        # num_dev = len(set(label.flatten()))
-        # num_pkt = len(label)
-        # num_pkt_per_dev = int(num_pkt/num_dev)
-        
-        # print('Dataset information: Dev ' + str(label_start) + ' to Dev ' + 
-        #       str(label_end) + ', ' + str(num_pkt_per_dev) + ' packets per device.')
-        
-        # Filter the dataset using a given range of allowed frames
-        sample_index_list = []
-        for dev_idx in set(label.flatten()):
-            sample_index_dev = np.where(label==int(dev_idx))[0][pkt_range].tolist()
-            sample_index_list.extend(sample_index_dev)
+        # If the list of devices isn't specified - loop through all of the available ones
+        if dev_range is None:
+            dev_range = set(label.flatten())
+
+        # Filter indexes of frames to keep based on dev_range
+        frame_idx_filtered = []
+        for dev_idx in dev_range:
+            # Extract only the specified devices, and for each only pkt_range frames
+            frame_idx_device = np.where(label==int(dev_idx))[0][pkt_range]
+            frame_idx_filtered.extend(frame_idx_device)
     
+        # Retrieve data from the dataset
         data = f[self.dataset_name][:]
+
+        # Convert from interleaved doubles to complex values
         data = self._convert_to_complex(data)
         
-        label = label[sample_index_list]
-        data = data[sample_index_list, :]
+        # Filter the dataset based on dev_range and pkt_range
+        label = label[frame_idx_filtered]
+        data = data[frame_idx_filtered, :]
           
         f.close()
-        return data,label
+        return data, label
 
 class ChannelIndSpectrogram():
     def __init__(self,):
@@ -150,7 +157,6 @@ class ChannelIndSpectrogram():
         RETURN:
             DATA_CHANNEL_IND_SPEC is channel independent spectrograms.
         '''
-        
         # Normalize the IQ samples.
         data = self._normalization(data)
         
@@ -162,7 +168,6 @@ class ChannelIndSpectrogram():
         
         # Convert each packet (IQ samples) to a channel independent spectrogram.
         for i in range(num_sample):
-                   
             chan_ind_spec_amp = self._gen_single_channel_ind_spectrogram(data[i], win_len=50, overlap=25)
             # chan_ind_spec_amp = self._spec_crop(chan_ind_spec_amp)
             data_channel_ind_spec[i,:,:,0] = chan_ind_spec_amp

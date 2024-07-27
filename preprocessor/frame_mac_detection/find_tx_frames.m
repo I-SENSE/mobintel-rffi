@@ -4,7 +4,7 @@
 
 function T = find_tx_frames(filepath, bw, samp_rate, search_mac_tx, preamble_len)
     X = read_iq(filepath);
-    % X = X(1:floor(length(X) / 4)); % TODO: only for larger files
+    % X = X(1:floor(length(X) / 10)); % TODO: only for larger files
 
     % 1. Analyze the waveform
     analyzer = WaveformAnalyzer();
@@ -37,14 +37,17 @@ function T = find_tx_frames(filepath, bw, samp_rate, search_mac_tx, preamble_len
             % Extract start & end indexes for the frame preamble
             x = analyzer.Results{mac_i};
     
-            preamble_start = x.PacketOffset;
-            preamble_end = preamble_start + preamble_len - 1;
-
-            % If you need a full frame:
-            % frame_end = frame_start + x.NumRxSamples;
+            samples_start = x.PacketOffset;
+        
+            % Load full frame if preamble length isn't specified
+            if preamble_len == -1
+                samples_end = samples_start + x.NumRxSamples;
+            else
+                samples_end = samples_start + preamble_len - 1;
+            end
     
-            preamble_bounds{end+1} = [preamble_start, preamble_end];
-            preamble_iq{end+1} = X(preamble_start:preamble_end);
+            preamble_bounds{end+1} = [samples_start, samples_end];
+            preamble_iq{end+1} = X(samples_start:samples_end);
         end
     end
     fprintf('\n');

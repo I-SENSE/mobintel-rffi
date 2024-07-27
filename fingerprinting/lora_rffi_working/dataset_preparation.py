@@ -163,7 +163,7 @@ class ChannelIndSpectrogram():
         # Calculate the size of channel independent spectrograms.
         num_sample = data.shape[0]
         num_row = 50 # int(256*0.4) # nfft (how many subcarriers)
-        num_column = 14 #int(np.floor((8192-256)/128 + 1) - 1) # of windows - 1
+        num_column = 38 #int(np.floor((8192-256)/128 + 1) - 1) # of windows - 1
         data_channel_ind_spec = np.zeros([num_sample, num_row, num_column, 1])
         
         # Convert each packet (IQ samples) to a channel independent spectrogram.

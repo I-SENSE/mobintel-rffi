@@ -39,7 +39,9 @@ MATLAB_SESSION_NAMES = [
     'mobintel_session_5',
     'mobintel_session_6',
     'mobintel_session_7',
-    'mobintel_session_8']
+    'mobintel_session_8',
+    'mobintel_session_9',
+    'mobintel_session_10']
 
 # MATLAB_SESSION_NAMES = ['mobintel_session_1']
 
@@ -58,7 +60,7 @@ def parse_dat_name(filename):
 
     # Extract samp_rate
     samp_rate_match = re.search(r'rxSampRate_(\d+e\d+)', filename)
-    samp_rate = int(float(samp_rate_match.group(1))) if samp_rate_match else None
+    samp_rate = float(samp_rate_match.group(1)) if samp_rate_match else None
 
     return {
         "node_tx": node_tx,
@@ -316,5 +318,24 @@ def main():
         else: 
             process_session(matlab_engine_queue, session_name, preamble_len, node_ids, node_macs)
 
+# def eval():
+#     # Check if a directory to store final dataset exists and create if not
+#     if not os.path.exists(RFFI_DATASET_TARGET_DIR):
+#         os.makedirs(RFFI_DATASET_TARGET_DIR)
+
+#     # Load a JSON file with device MAC addresses from S3 experiment folder
+#     node_macs_local_path = os.path.join(RFFI_DATASET_TARGET_DIR, NODE_MACS)
+#     download_file_with_progress(S3_BUCKET_NAME, f"{S3_EXPERIMENT_NAME}/{NODE_MACS}", node_macs_local_path)
+#     node_macs = read_json_file(node_macs_local_path)
+
+#     codepath = '/home/smazokha2016/Desktop/mobintel-rffi/preprocessor/frame_mac_detection'
+
+#     matlab_engine = matlab.engine.connect_matlab('temp_session')
+#     matlab_engine.cd(codepath, nargout=0)
+#     # matlab_engine.find_tx_frames(filepath, 'CBW20', 25e6, '00:60:b3:ac:a1:cb', 400)
+
+#     process_dat_file(matlab_engine, 'training_2024-07-20_00-50-38', 'tx{node_node1-10}_rx{node_node1-1+rxFreq_2462e6+rxGain_10+capLen_2+rxSampRate_25e6}.dat', node_macs, -1)
+
 if __name__ == "__main__":
     main()
+    # eval()

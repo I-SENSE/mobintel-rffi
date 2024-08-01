@@ -1,4 +1,6 @@
 function [T] = augmentation(file_path, Fs, t_rms_bounds, f_d_bounds, k_factor_bounds, N)
+    rng(1234);
+
     label = h5read(file_path, '/label');
     data = h5read(file_path, '/data');
 

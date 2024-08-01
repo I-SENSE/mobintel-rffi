@@ -2,9 +2,10 @@ import numpy as np
 import h5py
 from numpy import sum,sqrt
 from numpy.random import standard_normal, uniform
+
 from scipy import signal
-import seaborn as sea
-import matplotlib.pyplot as plt
+
+# In[]
 
 def awgn(data, snr_range):
     
@@ -21,6 +22,8 @@ def awgn(data, snr_range):
 
     return data 
 
+
+
 class LoadDataset():
     def __init__(self,):
         self.dataset_name = 'data'
@@ -28,19 +31,14 @@ class LoadDataset():
         
     def _convert_to_complex(self, data):
         '''Convert the loaded data to complex IQ samples.'''
-        return data[:, 0::2] + 1j * data[:, 1::2]
-
-    def shuffle(self, data, labels):
-        # Produce a new order for elements
-        new_order = np.arange(labels.shape[0])
-        np.random.shuffle(new_order)
-
-        data = data[new_order, :]
-        labels = labels[new_order]
-
-        return data, labels
+        num_row = data.shape[0]
+        num_col = data.shape[1] 
+        data_complex = np.zeros([num_row,round(num_col/2)],dtype=complex)
+     
+        data_complex = data[:,:round(num_col/2)] + 1j*data[:,round(num_col/2):] 
+        return data_complex
     
-    def load_iq_samples(self, file_path):
+    def load_iq_samples(self, file_path, dev_range, pkt_range):
         '''
         Load IQ samples from a dataset.
         
@@ -60,30 +58,33 @@ class LoadDataset():
         f = h5py.File(file_path,'r')
         label = f[self.labelset_name][:]
         label = label.astype(int)
-
-        # # If the list of devices isn't specified - loop through all of the available ones
-        # if dev_range is None:
-        #     dev_range = set(label.flatten())
-
-        # # Filter indexes of frames to keep based on dev_range
-        # frame_idx_filtered = []
-        # for dev_idx in dev_range:
-        #     # Extract only the specified devices, and for each only pkt_range frames
-        #     frame_idx_device = np.where(label==int(dev_idx))[0][pkt_range]
-        #     frame_idx_filtered.extend(frame_idx_device)
+        label = np.transpose(label)
+        label = label - 1
+        
+        label_start = int(label[0]) + 1
+        label_end = int(label[-1]) + 1
+        num_dev = label_end - label_start + 1
+        num_pkt = len(label)
+        num_pkt_per_dev = int(num_pkt/num_dev)
+        
+        print('Dataset information: Dev ' + str(label_start) + ' to Dev ' + 
+              str(label_end) + ', ' + str(num_pkt_per_dev) + ' packets per device.')
+        
+        sample_index_list = []
+        
+        for dev_idx in dev_range:
+            sample_index_dev = np.where(label==dev_idx)[0][pkt_range].tolist()
+            sample_index_list.extend(sample_index_dev)
     
-        # Retrieve data from the dataset
-        data = f[self.dataset_name][:]
-
-        # Convert from interleaved doubles to complex values
+        data = f[self.dataset_name][sample_index_list]
         data = self._convert_to_complex(data)
         
-        # # Filter the dataset based on dev_range and pkt_range
-        # label = label[frame_idx_filtered]
-        # data = data[frame_idx_filtered, :]
+        label = label[sample_index_list]
           
         f.close()
-        return data, label
+        return data,label
+
+
 
 class ChannelIndSpectrogram():
     def __init__(self,):
@@ -137,7 +138,7 @@ class ChannelIndSpectrogram():
         
         # FFT shift to adjust the central frequency.
         spec = np.fft.fftshift(spec, axes=0)
-
+        
         # Generate channel independent spectrogram.
         chan_ind_spec = spec[:,1:]/spec[:,:-1]    
         
@@ -146,7 +147,9 @@ class ChannelIndSpectrogram():
                   
         return chan_ind_spec_amp
     
-    def channel_ind_spectrogram(self, data, row=50, col=14):
+
+
+    def channel_ind_spectrogram(self, data):
         '''
         channel_ind_spectrogram converts IQ samples to channel independent 
         spectrograms.
@@ -157,20 +160,21 @@ class ChannelIndSpectrogram():
         RETURN:
             DATA_CHANNEL_IND_SPEC is channel independent spectrograms.
         '''
+        
         # Normalize the IQ samples.
         data = self._normalization(data)
         
         # Calculate the size of channel independent spectrograms.
         num_sample = data.shape[0]
-        num_row = row # int(256*0.4) # nfft (how many subcarriers)
-        # num_column = 38 #int(np.floor((8192-256)/128 + 1) - 1) # of windows - 1
-        num_column = col
+        num_row = int(256*0.4)
+        num_column = int(np.floor((data.shape[1]-256)/128 + 1) - 1)
         data_channel_ind_spec = np.zeros([num_sample, num_row, num_column, 1])
         
         # Convert each packet (IQ samples) to a channel independent spectrogram.
         for i in range(num_sample):
-            chan_ind_spec_amp = self._gen_single_channel_ind_spectrogram(data[i], win_len=50, overlap=25)
-            # chan_ind_spec_amp = self._spec_crop(chan_ind_spec_amp)
+                   
+            chan_ind_spec_amp = self._gen_single_channel_ind_spectrogram(data[i])
+            chan_ind_spec_amp = self._spec_crop(chan_ind_spec_amp)
             data_channel_ind_spec[i,:,:,0] = chan_ind_spec_amp
             
         return data_channel_ind_spec

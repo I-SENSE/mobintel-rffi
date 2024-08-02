@@ -140,10 +140,11 @@ def generate_node_ids():
     return ids
 
 # Save an h5 dataset file containing labels & data for a given set of devices
-def save_dataset_h5(file_target, label, data):
+def save_dataset_h5(file_target, label, data, rssi):
     print('Saving', file_target)
     with h5py.File(file_target, 'w') as h5file:
         h5file.create_dataset('label', data=label, dtype='float64')
+        h5file.create_dataset('rssi', data=rssi, dtype='float64')
         h5file.create_dataset('data', data=data, dtype='float64')  
 
 # Package & store epoch infromation in h5 file (ready for RFFI)
@@ -156,21 +157,25 @@ def epoch_save(node_ids_dict, target_dir, epoch_preambles, session_name, preambl
         h5_data = np.zeros((len(rx_epochs) * FRAME_COUNT, preamble_len * 2), dtype='float64')
         # Labels shape: (epochs x frames, 1)
         h5_labels = np.zeros((len(rx_epochs) * FRAME_COUNT, 1), dtype='float64')
+        # RSSI shape: (epochs x frames, 1)
+        h5_rssi = np.zeros((len(rx_epochs) * FRAME_COUNT, 1), dtype='float64')
 
         h5_idx = 0
         for rx_epoch in rx_epochs:
             preambles = rx_epoch['preambles']
+            rssi = rx_epoch['rssi']
             tx_node_name = rx_epoch['node_tx']
             for preamble_i in np.arange(0, preambles.shape[0]):
                 h5_data[h5_idx, 0::2] = np.real(preambles[preamble_i, :])
                 h5_data[h5_idx, 1::2] = np.imag(preambles[preamble_i, :])
 
                 h5_labels[h5_idx] = node_ids_dict[tx_node_name]
+                h5_rssi[h5_idx] = rssi[preamble_i]
 
                 h5_idx = h5_idx + 1
 
         dataset_filepath = os.path.join(target_dir, f'node{rx_name}_{session_name}.h5')
-        save_dataset_h5(dataset_filepath, h5_labels, h5_data)
+        save_dataset_h5(dataset_filepath, h5_labels, h5_data, h5_rssi)
 
 def is_session_valid(session_name):
     return session_name[0:6] == 'epoch_' or session_name[0:9] == 'training_'
@@ -197,11 +202,13 @@ def process_dat_file(matlab_engine, session_name, dat_file, node_macs, preamble_
     response = matlab_engine.find_tx_frames(local_filepath, 'CBW20', samp_rate, tx_mac, preamble_len)
     # preamble_bounds = np.array(response['preamble_bounds']).squeeze()
     preamble_iq = np.array(response['preamble_iq']).squeeze()
+    rssi = np.array(response['rssi']).squeeze()
 
     # 3.3. Prepare information from a current dat file
     if preamble_iq.shape[0] >= FRAME_COUNT:
         file_preambles = {
             'preambles': preamble_iq[0:FRAME_COUNT, :],
+            'rssi': rssi,
             'node_tx': tx_name,
             'node_rx': rx_name,
             'node_mac': tx_mac

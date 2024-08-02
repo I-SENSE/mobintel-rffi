@@ -25,7 +25,8 @@ class LoadDataset():
     def __init__(self,):
         self.dataset_name = 'data'
         self.labelset_name = 'label'
-        
+        self.rssiset_name = 'rssi'
+
     def _convert_to_complex(self, data):
         '''Convert the loaded data to complex IQ samples.'''
         return data[:, 0::2] + 1j * data[:, 1::2]
@@ -58,6 +59,7 @@ class LoadDataset():
         '''
         
         f = h5py.File(file_path,'r')
+        rssi = f[self.rssiset_name][:]
         label = f[self.labelset_name][:]
         label = label.astype(int)
 
@@ -83,7 +85,7 @@ class LoadDataset():
         # data = data[frame_idx_filtered, :]
           
         f.close()
-        return data, label
+        return data, label, rssi
 
 class ChannelIndSpectrogram():
     def __init__(self,):

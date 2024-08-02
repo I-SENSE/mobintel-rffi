@@ -13,6 +13,7 @@ function T = find_tx_frames(filepath, bw, samp_rate, search_mac_tx, preamble_len
     % 2. Extract MAC info for a given frame
     preamble_bounds = {};
     preamble_iq = {};
+    rssi = {};
     
     fprintf('Searching for %s\n', search_mac_tx);
     printout_counter = 0;
@@ -48,6 +49,7 @@ function T = find_tx_frames(filepath, bw, samp_rate, search_mac_tx, preamble_len
     
             preamble_bounds{end+1} = [samples_start, samples_end];
             preamble_iq{end+1} = X(samples_start:samples_end);
+            rssi{end+1} = round(10*log10(x.PacketPower),2);
         end
     end
     fprintf('\n');
@@ -57,6 +59,7 @@ function T = find_tx_frames(filepath, bw, samp_rate, search_mac_tx, preamble_len
     T = struct();
     T.('preamble_bounds') = preamble_bounds;
     T.('preamble_iq') = preamble_iq;
+    T.('rssi') = rssi;
 end
 
 function [formattedMac] = parse_mac_address(mac)
